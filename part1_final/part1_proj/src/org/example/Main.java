@@ -105,7 +105,7 @@ public class Main {
                         location = scanner.next();
                         System.out.println();
 
-                        if(!Objects.equals(location, "./relation_file")) {
+                        if(!Objects.equals(location, "./relation_file/")) {
                             System.out.println("[ERROR] Not supported location. Try again");
                             System.out.println();
                         } else {
@@ -217,6 +217,9 @@ public class Main {
                         attributeMetadataList.add(createAtt);
                     }
 
+                    FileOutputStream output = new FileOutputStream(location + "/" + relationName + ".txt");
+                    output.close();
+
                     // Insert relation metadata
                     String relInsertSQL = "insert into relation_metadata(relation_name, number_of_attributes, storage_organization, location) values(?,?,?,?)";
                     PreparedStatement pstmt = conn.prepareStatement(relInsertSQL);
@@ -260,6 +263,10 @@ public class Main {
                 }
                 System.out.println();
             }
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         } finally {
             if(conn != null) {
                 conn.close();
