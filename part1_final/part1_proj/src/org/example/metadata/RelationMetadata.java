@@ -3,6 +3,14 @@ package org.example.metadata;
 public class RelationMetadata {
     private String relationName;
     private int numberOfAttributes;
+
+    public RelationMetadata(String relationName, int numberOfAttributes, String storageOrganization, String location) {
+        this.relationName = relationName;
+        this.numberOfAttributes = numberOfAttributes;
+        this.storageOrganization = storageOrganization;
+        this.location = location;
+    }
+
     private String storageOrganization;
     private String location;
 

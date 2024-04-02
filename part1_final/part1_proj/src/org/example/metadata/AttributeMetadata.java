@@ -7,6 +7,18 @@ public class AttributeMetadata {
     private int position;
     private int length;
     private boolean isPrimary;
+
+    public AttributeMetadata(String relationName, String attributeName, String domainType, int position, int length, boolean isPrimary, String referenceRelationName, String referenceAttributeName) {
+        this.relationName = relationName;
+        this.attributeName = attributeName;
+        this.domainType = domainType;
+        this.position = position;
+        this.length = length;
+        this.isPrimary = isPrimary;
+        this.referenceRelationName = referenceRelationName;
+        this.referenceAttributeName = referenceAttributeName;
+    }
+
     private String referenceRelationName;
     private String referenceAttributeName;
 
