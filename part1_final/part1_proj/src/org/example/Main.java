@@ -217,6 +217,32 @@ public class Main {
                         attributeMetadataList.add(createAtt);
                     }
 
+                    // Insert relation metadata
+                    String relInsertSQL = "insert into relation_metadata(relation_name, number_of_attributes, storage_organization, location) values(?,?,?,?)";
+                    PreparedStatement pstmt = conn.prepareStatement(relInsertSQL);
+                    pstmt.setString(1, relationMetadata.getRelationName());
+                    pstmt.setInt(2, relationMetadata.getNumberOfAttributes());
+                    pstmt.setString(3, relationMetadata.getStorageOrganization());
+                    pstmt.setString(4, relationMetadata.getLocation());
+                    pstmt.executeUpdate();
+                    pstmt.close();
+
+                    // Insert attribute metadata
+                    String attInsertSQL = "insert into attribute_metadata(relation_name, attribute_name, domain_type, position, length, is_primary, reference_relation_name, reference_attribute_name) values(?, ?, ?, ?, ?, ?, ?, ?)";
+                    pstmt = conn.prepareStatement(attInsertSQL);
+
+                    for (AttributeMetadata att : attributeMetadataList) {
+                        pstmt.setString(1, att.getRelationName());
+                        pstmt.setString(2, att.getAttributeName());
+                        pstmt.setString(3, att.getDomainType());
+                        pstmt.setInt(4, att.getPosition());
+                        pstmt.setInt(5, att.getLength());
+                        pstmt.setBoolean(6, att.isPrimary());
+                        pstmt.setString(7, att.getReferenceRelationName());
+                        pstmt.setString(8, att.getReferenceAttributeName());
+                        pstmt.executeUpdate();
+                    }
+                    pstmt.close();
 
                 } else if (Objects.equals(command, "2")) {
 ;
