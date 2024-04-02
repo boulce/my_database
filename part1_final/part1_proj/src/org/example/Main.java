@@ -1,11 +1,13 @@
 package org.example;
 
+import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.*;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.Scanner;
 
@@ -47,17 +49,19 @@ public class Main {
 
                 if (Objects.equals(command, "1")) {
 //                    TODO 테이블 생성, 파일은 table 디렉토리에 저장
-                    // Enter Relation Information
+                    // Enter Relation Metadata
                     String relationName;
+                    int numberOfAttributes;
                     String storageOrganization;
                     String location;
-                    int numberOfAttributes;
 
                     while(true) {
+                        System.out.println("Enter relation information...");
                         System.out.printf("Enter the relation name: ");
                         relationName = scanner.next();
                         System.out.println();
 
+                        // Check primary key constraint
                         PreparedStatement pstmt = conn.prepareStatement("SELECT relation_name FROM relation_metadata WHERE relation_name = ?");
                         pstmt.setString(1, relationName);
                         ResultSet rs = pstmt.executeQuery();
@@ -72,10 +76,9 @@ public class Main {
                         rs.close();
 
                         if(exist) {
-                            System.out.println("[ERROR] There are relation that has same name '" + existingRelationName+ "'. Try again");
+                            System.out.println("[ERROR] There is the relation that has same name '" + existingRelationName+ "'. Try again");
                             System.out.println();
-                        }
-                        else{
+                        } else{
                             break;
                         }
                     }
@@ -92,8 +95,7 @@ public class Main {
                         if(!Objects.equals(storageOrganization, "free_list")) {
                             System.out.println("[ERROR] Not supported storage organization. Try again");
                             System.out.println();
-                        }
-                        else {
+                        } else {
                             break;
                         }
                     }
@@ -106,13 +108,114 @@ public class Main {
                         if(!Objects.equals(location, "./relation_file")) {
                             System.out.println("[ERROR] Not supported location. Try again");
                             System.out.println();
-                        }
-                        else {
+                        } else {
                             break;
                         }
                     }
 
                     RelationMetadata relationMetadata = new RelationMetadata(relationName, numberOfAttributes, storageOrganization, location);
+
+
+                    String attributeName;
+                    String domainType;
+                    int length;
+                    boolean isPrimary;
+                    String referenceRelationName;
+                    String referenceAttributeName;
+
+                    ArrayList<AttributeMetadata> attributeMetadataList = new ArrayList<>();
+                    // Enter Attribute Metadata
+                    for(int attIdx = 0; attIdx < numberOfAttributes; attIdx++) {
+                        System.out.println("Enter attribute[" + attIdx + "] information...");
+
+                        while(true) {
+                            System.out.printf("Enter the attribute name: ");
+                            attributeName = scanner.next();
+                            System.out.println();
+
+                            // Check primary key constraint
+                            boolean exist = false;
+                            for (AttributeMetadata data : attributeMetadataList) {
+                                if(Objects.equals(data.getAttributeName(), attributeName)) {
+                                    exist = true;
+                                    break;
+                                }
+                            }
+
+                            if(exist) {
+                                System.out.println("[ERROR] There is the attribute that has same name '" + attributeName+ "'. Try again");
+                                System.out.println();
+                            } else {
+                                break;
+                            }
+                        }
+
+                        while(true) {
+                            System.out.printf("Enter the domain type: ");
+                            domainType = scanner.next();
+                            System.out.println();
+
+                            if(!Objects.equals(domainType, "char")) {
+                                System.out.println("[ERROR] Not supported domain type. Try again");
+                                System.out.println();
+                            } else {
+                                break;
+                            }
+                        }
+
+                        System.out.printf("Enter the length: ");
+                        length = scanner.nextInt();
+                        System.out.println();
+
+
+                        String isPrimaryStr;
+                        System.out.printf("Answer whether it is primary key  (if it is true, enter 'yes'): ");
+                        isPrimaryStr = scanner.next();
+                        System.out.println();
+
+                        if(Objects.equals(isPrimaryStr, "yes")) {
+                            isPrimary = true;
+                        } else {
+                            isPrimary = false;
+                        }
+
+                        while(true){
+                            System.out.printf("Enter the reference relation name (if you want null, enter 'NULL'): ");
+                            referenceRelationName = scanner.next();
+                            System.out.println();
+
+                            if(!Objects.equals(referenceRelationName.toUpperCase(), "NULL")) {
+                                System.out.println("[ERROR] Not supported reference relation Name. Try again");
+                                System.out.println();
+                            } else {
+                                break;
+                            }
+
+                            if(Objects.equals(referenceRelationName.toUpperCase(), "NULL")) {
+                                referenceRelationName = null;
+                            }
+                        }
+
+                        while(true){
+                            System.out.printf("Enter the reference attribute name (if you want null, enter 'NULL'): ");
+                            referenceAttributeName = scanner.next();
+                            System.out.println();
+
+                            if(!Objects.equals(referenceAttributeName.toUpperCase(), "NULL")) {
+                                System.out.println("[ERROR] Not supported reference attribute Name. Try again");
+                                System.out.println();
+                            } else {
+                                break;
+                            }
+
+                            if(Objects.equals(referenceAttributeName.toUpperCase(), "NULL")) {
+                                referenceRelationName = null;
+                            }
+                        }
+
+                        AttributeMetadata createAtt = new AttributeMetadata(relationMetadata.getRelationName(), attributeName, domainType, attIdx, length, isPrimary, referenceRelationName, referenceAttributeName);
+                        attributeMetadataList.add(createAtt);
+                    }
 
 
                 } else if (Objects.equals(command, "2")) {
