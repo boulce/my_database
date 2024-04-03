@@ -3,23 +3,21 @@ package org.example;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.record.Block;
-import org.example.record.Record;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
+
 import java.sql.*;
 import java.util.*;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
 public class Main {
     private static String dbURL = "jdbc:mysql://localhost:3306/part1?serverTimezone=UTC&useUniCode=yes&characterEncoding=UTF-8";
     private static String dbUser = "root";
     private static String dbPassword = "0905";
 
 
-    public static void main(String[] args) throws SQLException {
+    public static void main(String[] args) throws SQLException, IOException {
 
         System.out.println();
         System.out.println(".___  ___. ____    ____     _______       ___      .___________.     ___      .______        ___           _______. _______ ");
@@ -59,6 +57,7 @@ public class Main {
                         System.out.println("Enter relation information...");
                         System.out.printf("Enter the relation name: ");
                         relationName = scanner.next();
+                        relationName = relationName.toLowerCase();
                         System.out.println();
 
                         // Check primary key constraint
@@ -115,7 +114,6 @@ public class Main {
 
                     RelationMetadata relationMetadata = new RelationMetadata(relationName, numberOfAttributes, storageOrganization, location);
 
-
                     String attributeName;
                     String domainType;
                     int length;
@@ -131,6 +129,7 @@ public class Main {
                         while(true) {
                             System.out.printf("Enter the attribute name: ");
                             attributeName = scanner.next();
+                            attributeName = attributeName.toLowerCase();
                             System.out.println();
 
                             // Check primary key constraint
@@ -219,10 +218,12 @@ public class Main {
 
                     // Create new block
                     List<char[]> attChars = getAttChars(attributeMetadataList);
-                    Block nullBlock = new Block(attChars);
+                    Block nullBlock = new Block(0, attChars);
 
+                    FileOutputStream output = new FileOutputStream(location + "/" + relationName + ".tbl");
 
-                    FileOutputStream output = new FileOutputStream(location + "/" + relationName + ".txt");
+                    output.write(nullBlock.getByteArray()); // // Write record to blockBytes (Block I/O)
+
                     output.close();
 
                     // Insert relation metadata

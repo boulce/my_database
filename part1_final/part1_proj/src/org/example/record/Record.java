@@ -36,4 +36,14 @@ public class Record {
         }
         return new Record(copyAtt, link);
     }
+
+    public int getSize() {
+        int len = 0;
+        for (char[] attribute : attributes) {
+            len += attribute.length;
+        }
+        len += 4;
+
+        return len;
+    }
 }
