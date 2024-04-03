@@ -4,8 +4,8 @@ import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.record.Block;
 
-import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.SQLException;
@@ -33,7 +33,7 @@ public class DDLInterpreter {
     }
 
     private static void makeRelationFile(String location, String relationName, Block nullBlock) throws IOException {
-        FileOutputStream output = new FileOutputStream(location + "/" + relationName + ".tbl");
+        RandomAccessFile output = new RandomAccessFile(location + "/" + relationName + ".tbl", "rw");
 
         output.write(nullBlock.getByteArray()); // // Write record to blockBytes (Block I/O)
 
