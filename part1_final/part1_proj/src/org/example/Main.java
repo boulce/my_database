@@ -2,14 +2,14 @@ package org.example;
 
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
+import org.example.record.Block;
+import org.example.record.Record;
 
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.sql.*;
-import java.util.ArrayList;
-import java.util.Objects;
-import java.util.Scanner;
+import java.util.*;
 
 //TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
 // click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
@@ -217,6 +217,11 @@ public class Main {
                         attributeMetadataList.add(createAtt);
                     }
 
+                    // Create new block
+                    List<char[]> attChars = getAttChars(attributeMetadataList);
+                    Block nullBlock = new Block(attChars);
+
+
                     FileOutputStream output = new FileOutputStream(location + "/" + relationName + ".txt");
                     output.close();
 
@@ -272,5 +277,14 @@ public class Main {
                 conn.close();
             }
         }
+    }
+
+    private static List<char[]> getAttChars(ArrayList<AttributeMetadata> attributeMetadataList) {
+        List<char[]> attChars = new ArrayList<>();
+
+        for (AttributeMetadata att : attributeMetadataList) {
+            attChars.add(new char[att.getLength()]);
+        }
+        return attChars;
     }
 }

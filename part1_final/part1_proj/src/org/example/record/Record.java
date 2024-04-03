@@ -1,5 +1,6 @@
 package org.example.record;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class Record {
@@ -25,5 +26,14 @@ public class Record {
 
     public void setLink(int link) {
         this.link = link;
+    }
+
+    public Record copyFactory() {
+        List<char[]> copyAtt = new ArrayList<>();
+
+        for (char[] attribute : attributes) {
+            copyAtt.add(attribute.clone());
+        }
+        return new Record(copyAtt, link);
     }
 }
