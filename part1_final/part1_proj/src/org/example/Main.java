@@ -2,7 +2,6 @@ package org.example;
 
 import org.example.ui.TextUI;
 
-import java.io.IOException;
 import java.sql.*;
 
 public class Main {

@@ -4,6 +4,10 @@ public class RelationMetadata {
     private String relationName;
     private int numberOfAttributes;
 
+    public RelationMetadata() {
+
+    }
+
     public RelationMetadata(String relationName, int numberOfAttributes, String storageOrganization, String location) {
         this.relationName = relationName;
         this.numberOfAttributes = numberOfAttributes;

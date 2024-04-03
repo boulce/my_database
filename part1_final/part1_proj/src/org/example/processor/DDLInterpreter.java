@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DDLInterpreter {
-    public static void createRelation(Connection conn, RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList) throws IOException, SQLException {
+    public static void createRelation(Connection conn, RelationMetadata relationMetadata, List<AttributeMetadata> attributeMetadataList) throws IOException, SQLException {
         // Create new block
         Block nullBlock = getBlock(attributeMetadataList);
 
@@ -26,7 +26,7 @@ public class DDLInterpreter {
         saveAttribteMetadata(attributeMetadataList, conn);
     }
 
-    private static Block getBlock(ArrayList<AttributeMetadata> attributeMetadataList) {
+    private static Block getBlock(List<AttributeMetadata> attributeMetadataList) {
         List<char[]> attChars = getAttChars(attributeMetadataList);
         Block nullBlock = new Block(0, attChars);
         return nullBlock;
@@ -51,7 +51,7 @@ public class DDLInterpreter {
         pstmt.close();
     }
 
-    private static void saveAttribteMetadata(ArrayList<AttributeMetadata> attributeMetadataList, Connection conn) throws SQLException {
+    private static void saveAttribteMetadata(List<AttributeMetadata> attributeMetadataList, Connection conn) throws SQLException {
         String attInsertSQL = "insert into attribute_metadata(relation_name, attribute_name, domain_type, position, length, is_primary, reference_relation_name, reference_attribute_name) values(?, ?, ?, ?, ?, ?, ?, ?)";
         PreparedStatement pstmt = conn.prepareStatement(attInsertSQL);
 
@@ -69,7 +69,7 @@ public class DDLInterpreter {
         pstmt.close();
     }
 
-    private static List<char[]> getAttChars(ArrayList<AttributeMetadata> attributeMetadataList) {
+    private static List<char[]> getAttChars(List<AttributeMetadata> attributeMetadataList) {
         List<char[]> attChars = new ArrayList<>();
 
         for (AttributeMetadata att : attributeMetadataList) {
