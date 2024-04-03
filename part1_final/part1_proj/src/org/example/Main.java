@@ -46,7 +46,6 @@ public class Main {
                 System.out.println();
 
                 if (Objects.equals(command, "1")) {
-//                    TODO 테이블 생성, 파일은 table 디렉토리에 저장
                     // Enter Relation Metadata
                     String relationName;
                     int numberOfAttributes;
