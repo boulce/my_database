@@ -5,7 +5,6 @@ import org.example.metadata.RelationMetadata;
 import org.example.processor.DDLInterpreter;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
-import org.example.util.ByteUtil;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -190,6 +189,196 @@ public class TextUI {
                 } else if (Objects.equals(command, "3")) {
 
                 } else if (Objects.equals(command, "4")) {
+                    // Get relation metadata
+                    RelationMetadata relationMetadata = new RelationMetadata();
+                    while(true) {
+                        String relationName;
+
+                        System.out.printf("Enter the relation name from which you select all tuple: ");
+                        relationName = scanner.next();
+                        relationName = relationName.toLowerCase();
+                        System.out.println();
+
+                        // Check primary key constraint
+                        PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM relation_metadata WHERE relation_name = ?");
+                        pstmt.setString(1, relationName);
+                        ResultSet rs = pstmt.executeQuery();
+
+                        boolean exist = rs.next();
+                        if (exist) {
+                            relationMetadata.setRelationName(rs.getString(1));
+                            relationMetadata.setNumberOfAttributes(rs.getInt(2));
+                            relationMetadata.setStorageOrganization(rs.getString(3));
+                            relationMetadata.setLocation(rs.getString(4));
+                        }
+
+                        rs.close();
+                        pstmt.close();
+
+                        if(!exist) {
+                            System.out.println("[ERROR] There isn't the relation that has same name '" + relationName + "'. Try again.");
+                            System.out.println();
+                        } else{
+                            break;
+                        }
+                    }
+
+                    // Get attribute metadata list
+                    ArrayList<AttributeMetadata> attributeMetadataList = new ArrayList<>();
+
+                    PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM attribute_metadata WHERE relation_name = ? ORDER BY position");
+                    pstmt.setString(1, relationMetadata.getRelationName());
+                    ResultSet rs = pstmt.executeQuery();
+
+                    int recordSize = 0;
+                    while(rs.next()) {
+                        String relationName = rs.getString(1);
+                        String attributeName = rs.getString(2);
+                        String domainType = rs.getString(3);
+                        int position = rs.getInt(4);
+                        int length = rs.getInt(5);
+                        boolean isPrimary = rs.getBoolean(6);
+                        String referenceRelationName = rs.getString(7);
+                        String referenceAttributeName = rs.getString(8);
+                        AttributeMetadata attributeMetadata = new AttributeMetadata(relationName, attributeName, domainType, position, length, isPrimary, referenceRelationName, referenceAttributeName);
+                        attributeMetadataList.add(attributeMetadata);
+                        recordSize += length;
+                    }
+                    recordSize += 4;
+
+                    rs.close();
+                    pstmt.close();
+
+                    // Get the attribute position of primary key
+                    // This will be used for judging deleted records and sorting the result set
+                    ArrayList<Integer> attPosOfPrimaryKey = new ArrayList<>();
+                    for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                        if(attributeMetadata.isPrimary()) {
+                            attPosOfPrimaryKey.add(attributeMetadata.getPosition());
+                        }
+                    }
+
+                    List<Record> resultSet = new ArrayList<>(); // This result set will save the records to show to user
+
+                    // Read from the file
+                    RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
+                    while(true) {
+                        int blockSize = recordSize * BlockingFactor.VAL;
+
+                        byte[] readBlockBytes = new byte[blockSize];
+                        int readCnt = input.read(readBlockBytes);
+
+                        if(readCnt == -1) { // EOF
+                            break;
+                        }
+
+                        for(int i = 0; i < BlockingFactor.VAL; i++) {
+                            byte[] recordBytes = new byte[recordSize];
+                            for(int j = 0; j < recordSize; j++) {
+                                recordBytes[j] = readBlockBytes[i*recordSize+j];
+                            }
+                            Record readRecord = new Record(recordBytes, attributeMetadataList);
+
+                            // If some attribute of primary-key of a record is NULL, it is a deleted record.
+                            // So don't contain the deleted record to the result set
+                            boolean isDeleted = false;
+                            for(int pos : attPosOfPrimaryKey) {
+                                if (isNullAttribute(readRecord.getAttributes().get(pos))){
+                                    isDeleted = true;
+                                    break;
+                                }
+                            }
+                            if(!isDeleted) {
+                                resultSet.add(readRecord);
+                            }
+                        }
+                    }
+                    input.close();
+
+                    // sort result set by primary key as ascending order
+                    resultSet.sort(new Comparator<Record>() {
+                        @Override
+                        public int compare(Record a, Record b) {
+                            for (Integer pos : attPosOfPrimaryKey) {
+                                String valA = new String(a.getAttributes().get(pos));
+                                String valB = new String(b.getAttributes().get(pos));
+
+                                if(valA.compareTo(valB) < 0) {
+                                    return -1;
+                                } else if (valA.compareTo(valB) > 0) {
+                                    return 1;
+                                }
+                            }
+
+                            return 0; // It won't occur, because the same there won't be same primary key records
+                        }
+                    });
+
+                    // Print the result set
+                    // Draw upper border
+                    System.out.print("┌");
+                    for(int s = 0; s < attributeMetadataList.size()-1; s++) {
+                        for(int i = 0; i < 19; i++) {
+                            System.out.print("—");
+                        }
+                        System.out.print("┬");
+                    }
+
+                    for(int i = 0; i < 19; i++) {
+                        System.out.print("—");
+                    }
+                    System.out.print("┐");
+
+                    System.out.println();
+
+                    System.out.print("│ ");
+                    for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                        System.out.printf("%20s", attributeMetadata.getAttributeName() + " │ ");
+                    }
+                    System.out.println();
+
+
+                    for (Record record : resultSet) {
+                        // Draw border
+                        System.out.print("├");
+                        for(int s = 0; s < attributeMetadataList.size()-1; s++) {
+                            for(int i = 0; i < 19; i++) {
+                                System.out.print("—");
+                            }
+                            System.out.print("┼");
+                        }
+                        for(int i = 0; i < 19; i++) {
+                            System.out.print("—");
+                        }
+                        System.out.print("┤");
+                        System.out.println();
+
+                        // Draw row
+                        System.out.print("│ ");
+                        for (char[] attribute : record.getAttributes()) {
+                            if(isNullAttribute(attribute)) {
+                                System.out.printf("%20s", "null" + " │ ");
+                            } else {
+                                System.out.printf("%20s", new String(attribute).trim() + " │ ");
+                            }
+                        }
+                        System.out.println();
+                    }
+
+                    // Draw lower border
+                    System.out.print("└");
+                    for(int s = 0; s < attributeMetadataList.size()-1; s++) {
+                        for(int i = 0; i < 19; i++) {
+                            System.out.print("—");
+                        }
+                        System.out.print("┴");
+                    }
+
+                    for(int i = 0; i < 19; i++) {
+                        System.out.print("—");
+                    }
+                    System.out.print("┘");
+                    System.out.println();
 
                 } else if (Objects.equals(command, "5")) {
 
@@ -385,5 +574,14 @@ public class TextUI {
             attributeMetadataList.add(createAtt);
         }
         return attributeMetadataList;
+    }
+
+    private boolean isNullAttribute(char[] attribute) {
+        for (char c : attribute) {
+            if(c != 0) {
+                return false;
+            }
+        }
+        return true;
     }
 }
