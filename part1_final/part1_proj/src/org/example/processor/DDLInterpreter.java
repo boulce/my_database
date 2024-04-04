@@ -33,7 +33,7 @@ public class DDLInterpreter {
     }
 
     private static void makeRelationFile(String location, String relationName, Block nullBlock) throws IOException {
-        RandomAccessFile output = new RandomAccessFile(location + "/" + relationName + ".tbl", "rw");
+        RandomAccessFile output = new RandomAccessFile(location + relationName + ".tbl", "rw");
 
         output.write(nullBlock.getByteArray()); // // Write record to blockBytes (Block I/O)
 

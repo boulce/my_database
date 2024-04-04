@@ -3,6 +3,9 @@ package org.example.ui;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.processor.DDLInterpreter;
+import org.example.record.BlockingFactor;
+import org.example.record.Record;
+import org.example.util.ByteUtil;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -11,6 +14,8 @@ import java.sql.*;
 import java.util.*;
 
 import static org.example.db.Config.*;
+import static org.example.record.NullConst.NULL_LINK;
+import static org.example.util.ByteUtil.*;
 
 public class TextUI {
 
@@ -135,7 +140,51 @@ public class TextUI {
                         tuple.add(val);
                     }
 
+                    //TODO 삽입 전에 primary key 존재하는지 판단하고 존재하면 처리해야함
+
+                    Record recordToInsert = new Record(tuple, 0);
+
+
                     // TODO free_list 헤더에 넣기 or 새로운 블록 삽입해서 넣기 로직 구현해야함
+                    RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
+                    int recordSize = recordToInsert.getSize();
+                    int blockSize = recordSize * BlockingFactor.VAL;
+                    int curReadBlock = 0;
+                    byte[] readBlockBytes = new byte[blockSize];
+                    input.read(readBlockBytes);
+                    input.close();
+
+                    // Get header link
+                    byte[] headerLinkBytes = new byte[4];
+                    for(int i = recordSize-4, j = 0; i < recordSize; i++, j++) {
+                        headerLinkBytes[j] = readBlockBytes[i];
+                    }
+                    int headerLink = byteArrayToInt(headerLinkBytes);
+
+                    if(headerLink == NULL_LINK) {
+
+                    } else {
+                        int nextBlockSeq = headerLink / blockSize;
+                        // TODO 디버깅위해 select all 먼저 구현하기
+                        // 파일 읽는다
+                        // 해당 레코드 위치 찾는다
+                        // 헤더의 링크에 해당 레코드의 링크를 대입한다
+                        // 해당 레코드에 입력한 레코드를 삽입한다.
+                        // 해당 블럭과 헤더 블럭을 파일에 쓴다. (만약 해당 블럭이 헤더 블럭이면 헤더 블럭만 쓴다)
+                    }
+
+                      // reading records except header
+//                    for(int i = 2*recordSize-4, j = 0; i < 2*recordSize; i++, j++) {
+//                        linkBytes[j] = readBlockBytes[i];
+//                    }
+//                    link = byteArrayToInt(linkBytes);
+//                    System.out.println(link);
+//
+//                    for(int i = 3*recordSize-4, j = 0; i < 3*recordSize; i++, j++) {
+//                        linkBytes[j] = readBlockBytes[i];
+//                    }
+//                    link = byteArrayToInt(linkBytes);
+//                    System.out.println(link);
 
 
                 } else if (Objects.equals(command, "3")) {

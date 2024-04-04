@@ -2,6 +2,8 @@ package org.example.record;
 
 import java.util.List;
 
+import static org.example.util.ByteUtil.intToByteArray;
+
 public class Block {
     int idx;
     Record records[];
@@ -66,21 +68,5 @@ public class Block {
             }
         }
         return blockBytes;
-    }
-
-    private  byte[] intToByteArray(int value) {
-        byte[] byteArray = new byte[4];
-        byteArray[0] = (byte)(value >> 24);
-        byteArray[1] = (byte)(value >> 16);
-        byteArray[2] = (byte)(value >> 8);
-        byteArray[3] = (byte)(value);
-        return byteArray;
-    }
-
-    private  int byteArrayToInt(byte bytes[]) {
-        return ((((int)bytes[0] & 0xff) << 24) |
-                (((int)bytes[1] & 0xff) << 16) |
-                (((int)bytes[2] & 0xff) << 8) |
-                (((int)bytes[3] & 0xff)));
     }
 }
