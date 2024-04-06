@@ -13,6 +13,7 @@ import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.sql.*;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static org.example.db.Config.*;
 import static org.example.record.NullConst.NULL_LINK;
@@ -85,33 +86,49 @@ public class TextUI {
                     // Get attribute metadata list
                     ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
 
-                    List<char[]> tuple = new ArrayList<>();
+                    // Get the attribute position of primary key
+                    List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
+
                     // Enter attribute information
-                    for (AttributeMetadata attributeMetadata : attributeMetadataList) {
-                        String valStr;
-                        char[] val = new char[attributeMetadata.getLength()];
+                    List<char[]> tuple = null;
+                    while(true) {
+                        tuple = new ArrayList<>();
+                        for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                            String valStr;
+                            char[] val = new char[attributeMetadata.getLength()];
 
-                        while(true) {
-                            System.out.printf("Enter the value of attribute '" + attributeMetadata.getAttributeName() + "' (type: "+attributeMetadata.getDomainType()+", length: "+attributeMetadata.getLength()+"): ");
-                            valStr = scanner.next();
-                            System.out.println();
-
-                            if(valStr.length() > attributeMetadata.getLength()) {
-                                System.out.println("[ERROR] Your input is bigger than the attribute size. Try again.");
+                            while(true) {
+                                System.out.printf("Enter the value of attribute '" + attributeMetadata.getAttributeName() + "' (type: "+attributeMetadata.getDomainType()+", length: "+attributeMetadata.getLength()+"): ");
+                                valStr = scanner.next();
                                 System.out.println();
+
+                                if(valStr.length() > attributeMetadata.getLength()) {
+                                    System.out.println("[ERROR] Your input is bigger than the attribute size. Try again.");
+                                    System.out.println();
+                                }
+                                else {
+                                    break;
+                                }
                             }
-                            else {
-                                break;
+
+                            for(int i = 0; i < valStr.length(); i++) {
+                                val[i] = valStr.charAt(i);
                             }
+                            tuple.add(val);
                         }
 
-                        for(int i = 0; i < valStr.length(); i++) {
-                            val[i] = valStr.charAt(i);
+                        // Check the primary key constraint
+                        List<char[]> finalTuple = tuple;
+                        Map<Integer, String> primaryKeyMap = attPosOfPrimaryKey.stream().collect(Collectors.toMap(pos -> pos, pos -> new String(finalTuple.get(pos)).trim()));
+                        List<Record> resultSet = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
+
+                        if(!resultSet.isEmpty()) {
+                            System.out.println("[ERROR] You entered duplicated primary key. Please try again");
+                        } else {
+                            break;
                         }
-                        tuple.add(val);
+                        System.out.println();
                     }
-
-                    //TODO 삽입 전에 primary key 존재하는지 판단하고 존재하면 처리해야함, select * from R where VAL = ? 먼저 구현하고 갖다 쓰기
 
                     Record recordToInsert = new Record(tuple, 0);
 
@@ -206,7 +223,7 @@ public class TextUI {
                     ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
 
                     // Get the attribute position of primary key
-                    ArrayList<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
+                    List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
 
                     HashMap<Integer, String> primaryKeyMap = getPrimaryKeyMap(attPosOfPrimaryKey, attributeMetadataList, scanner);
 
@@ -431,7 +448,7 @@ public class TextUI {
         return relationMetadata;
     }
 
-    private static HashMap<Integer, String> getPrimaryKeyMap(ArrayList<Integer> attPosOfPrimaryKey, ArrayList<AttributeMetadata> attributeMetadataList, Scanner scanner) {
+    private static HashMap<Integer, String> getPrimaryKeyMap(List<Integer> attPosOfPrimaryKey, ArrayList<AttributeMetadata> attributeMetadataList, Scanner scanner) {
         HashMap<Integer, String> primaryKeyMap = new HashMap<>(); // { primary_key_attribute, value }
 
         for (Integer pos : attPosOfPrimaryKey) {

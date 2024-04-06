@@ -9,10 +9,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
+import java.util.*;
 
 public class DMLOrganizer {
     public boolean isValidRelationMetatdata(Connection conn, String relationName, RelationMetadata relationMetadata) throws SQLException {
@@ -63,7 +60,7 @@ public class DMLOrganizer {
 
         // Get the attribute position of primary key
         // This will be used for judging deleted records and sorting the result set
-        ArrayList<Integer> attPosOfPrimaryKey = getAttPosOfPrimaryKey(attributeMetadataList);
+        List<Integer> attPosOfPrimaryKey = getAttPosOfPrimaryKey(attributeMetadataList);
 
         QueryEvaluationEngine queryEvaluationEngine = new QueryEvaluationEngine();
         List<Record> resultSet = queryEvaluationEngine.getRecordsForSelectAll(relationMetadata, attributeMetadataList, recordSize, attPosOfPrimaryKey);
@@ -73,7 +70,7 @@ public class DMLOrganizer {
         return resultSet;
     }
 
-    public List<Record> getResultSetForSelectOne(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, HashMap<Integer, String> primaryKeyMap) throws IOException {
+    public List<Record> getResultSetForSelectOne(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, Map<Integer, String> primaryKeyMap) throws IOException {
         int recordSize = getRecordSize(attributeMetadataList);
 
         QueryEvaluationEngine queryEvaluationEngine = new QueryEvaluationEngine();
@@ -91,8 +88,8 @@ public class DMLOrganizer {
         return recordSize;
     }
 
-    public ArrayList<Integer> getAttPosOfPrimaryKey(ArrayList<AttributeMetadata> attributeMetadataList) {
-        ArrayList<Integer> attPosOfPrimaryKey = new ArrayList<>();
+    public List<Integer> getAttPosOfPrimaryKey(ArrayList<AttributeMetadata> attributeMetadataList) {
+        List<Integer> attPosOfPrimaryKey = new ArrayList<>();
         for (AttributeMetadata attributeMetadata : attributeMetadataList) {
             if(attributeMetadata.isPrimary()) {
                 attPosOfPrimaryKey.add(attributeMetadata.getPosition());
@@ -101,7 +98,7 @@ public class DMLOrganizer {
         return attPosOfPrimaryKey;
     }
 
-    private static void sortResultSetByAttributes(ArrayList<Integer> attPosOfPrimaryKey, List<Record> resultSet) {
+    private static void sortResultSetByAttributes(List<Integer> attPosOfPrimaryKey, List<Record> resultSet) {
         resultSet.sort(new Comparator<Record>() {
             @Override
             public int compare(Record a, Record b) {

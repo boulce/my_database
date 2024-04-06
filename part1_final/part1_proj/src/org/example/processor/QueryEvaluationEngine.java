@@ -10,11 +10,12 @@ import java.io.RandomAccessFile;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import static org.example.record.NullConst.isNullAttribute;
 
 public class QueryEvaluationEngine {
-    List<Record> getRecordsForSelectAll(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, int recordSize, ArrayList<Integer> attPosOfPrimaryKey) throws IOException {
+    List<Record> getRecordsForSelectAll(RelationMetadata relationMetadata, List<AttributeMetadata> attributeMetadataList, int recordSize, List<Integer> attPosOfPrimaryKey) throws IOException {
         List<Record> resultSet = new ArrayList<>(); // This result set will save the records to show to user
 
         // Read from the file
@@ -54,7 +55,7 @@ public class QueryEvaluationEngine {
         return resultSet;
     }
 
-    List<Record> getRecordsForSelectOne(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, int recordSize, HashMap<Integer, String> primaryKeyMap) throws IOException {
+    List<Record> getRecordsForSelectOne(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, int recordSize, Map<Integer, String> primaryKeyMap) throws IOException {
         List<Record> resultSet = new ArrayList<>(); // This result set will save the records to show to user
 
         // Read from the file
