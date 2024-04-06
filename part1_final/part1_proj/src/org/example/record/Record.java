@@ -6,6 +6,8 @@ import org.example.util.ByteUtil;
 import java.util.ArrayList;
 import java.util.List;
 
+import static org.example.util.ByteUtil.intToByteArray;
+
 public class Record {
     List<char[]> attributes;
     int link;
@@ -68,5 +70,29 @@ public class Record {
         len += 4;
 
         return len;
+    }
+
+    public byte[] getByteArray() {
+        byte[] recordBytes = new byte[getSize()];
+
+        // Write Attribute to recordBytes
+        int attIdx = 0;
+        for (char[] att : attributes) {
+            byte[] attBytes = new byte[att.length];
+
+            for (int j = 0; j < att.length; j++) {
+                attBytes[j] = (byte) att[j];
+            }
+
+            for (int j = 0; j < attBytes.length; j++, attIdx++) {
+                recordBytes[attIdx] = attBytes[j];
+            }
+        }
+
+        byte[] linkBytes = intToByteArray(link);
+        for (int j = 0; j < linkBytes.length; j++, attIdx++) {
+            recordBytes[attIdx] = linkBytes[j];
+        }
+        return recordBytes;
     }
 }

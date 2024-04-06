@@ -1,5 +1,9 @@
 package org.example.record;
 
+import org.example.metadata.AttributeMetadata;
+import org.example.util.ByteUtil;
+
+import java.util.ArrayList;
 import java.util.List;
 
 import static org.example.util.ByteUtil.intToByteArray;
@@ -7,6 +11,14 @@ import static org.example.util.ByteUtil.intToByteArray;
 public class Block {
     int idx;
     Record records[];
+
+    public int getIdx() {
+        return idx;
+    }
+
+    public void setIdx(int idx) {
+        this.idx = idx;
+    }
 
     public Block(int idx, List<char[]> attChars) {
         this.idx = idx;
@@ -25,6 +37,32 @@ public class Block {
             records[i].setLink(idx * blockSize + recordSize * (i+1));
         }
     }
+
+    public Block(int idx, byte[] blockBytes, List<AttributeMetadata> attributeMetadataList) {
+        this.idx = idx;
+        this.records = new Record[BlockingFactor.VAL];
+
+        int bytesIdx = 0;
+        for(int i = 0; i < BlockingFactor.VAL; i++) {
+            List<char[]> attributes = new ArrayList<>();
+            for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                int attributeLength = attributeMetadata.getLength();
+                char[] attribute = new char[attributeLength];
+                for (int j = 0; j < attributeLength; j++) {
+                    attribute[j] = (char) blockBytes[bytesIdx++];
+                }
+                attributes.add(attribute);
+            }
+
+            byte[] linkBytes = new byte[4];
+            for(int j = 0; j < 4; j++) {
+                linkBytes[j] = blockBytes[bytesIdx++];
+            }
+            int link = ByteUtil.byteArrayToInt(linkBytes);
+            records[i] = new Record(attributes, link);
+        }
+    }
+
     public Record[] getRecords() {
         return records;
     }
@@ -69,4 +107,34 @@ public class Block {
         }
         return blockBytes;
     }
+
+//    public byte[] getRecordByteArray(int recordIdx) {
+//        if(recordIdx >= BlockingFactor.VAL) {
+//            throw new RuntimeException();
+//        }
+//
+//        int recordSize = records[0].getSize();
+//
+//        byte[] recordBytes = new byte[recordSize];
+//
+//        // Write Attribute to recordBytes
+//        int attIdx = 0;
+//        for (char[] att : records[recordIdx].getAttributes()) {
+//            byte[] attBytes = new byte[att.length];
+//
+//            for (int j = 0; j < att.length; j++) {
+//                attBytes[j] = (byte) att[j];
+//            }
+//
+//            for (int j = 0; j < attBytes.length; j++, attIdx++) {
+//                recordBytes[attIdx] = attBytes[j];
+//            }
+//        }
+//
+//        byte[] linkBytes = intToByteArray(records[recordIdx].getLink());
+//        for (int j = 0; j < linkBytes.length; j++, attIdx++) {
+//            recordBytes[attIdx] = linkBytes[j];
+//        }
+//        return recordBytes;
+//    }
 }
