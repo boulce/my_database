@@ -15,10 +15,8 @@ import java.sql.*;
 import java.util.*;
 
 import static org.example.db.Config.*;
-import static org.example.processor.DMLOrganizer.*;
 import static org.example.record.NullConst.NULL_LINK;
 import static org.example.record.NullConst.isNullAttribute;
-import static org.example.util.ByteUtil.*;
 
 public class TextUI {
 
@@ -61,6 +59,8 @@ public class TextUI {
                     ddlInterpreter.createRelation(conn, relationMetadata, attributeMetadataList);
 
                 } else if (Objects.equals(command, "2")) {
+                    //TODO insert refactoring
+
                     // Get relation metadata
                     RelationMetadata relationMetadata = new RelationMetadata();
                     while(true) {
@@ -199,6 +199,20 @@ public class TextUI {
                     printResultSet(attributeMetadataList, resultSet);
 
                 } else if (Objects.equals(command, "5")) {
+                    // Get relation metadata
+                    RelationMetadata relationMetadata = getValidRelationMetadata(scanner, conn, dmlOrganizer);
+
+                    // Get attribute metadata list
+                    ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
+
+                    // Get the attribute position of primary key
+                    ArrayList<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
+
+                    HashMap<Integer, String> primaryKeyMap = getPrimaryKeyMap(attPosOfPrimaryKey, attributeMetadataList, scanner);
+
+                    List<Record> resultSetForSelectOne = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
+
+                    printResultSet(attributeMetadataList, resultSetForSelectOne);
 
                 } else if (Objects.equals(command, "0")) {
                     System.out.println("Stop My Database.......");
@@ -415,6 +429,28 @@ public class TextUI {
             }
         }
         return relationMetadata;
+    }
+
+    private static HashMap<Integer, String> getPrimaryKeyMap(ArrayList<Integer> attPosOfPrimaryKey, ArrayList<AttributeMetadata> attributeMetadataList, Scanner scanner) {
+        HashMap<Integer, String> primaryKeyMap = new HashMap<>(); // { primary_key_attribute, value }
+
+        for (Integer pos : attPosOfPrimaryKey) {
+            while(true) {
+                System.out.printf("Enter the search key of primary key attribute '" + attributeMetadataList.get(pos).getAttributeName() + "' (type: "+ attributeMetadataList.get(pos).getDomainType()+", length: " + attributeMetadataList.get(pos).getLength()+"): ");
+                String key = scanner.next();
+                System.out.println();
+
+                if(key.length() > attributeMetadataList.get(pos).getLength()) {
+                    System.out.println("[ERROR] Your input is bigger than the attribute size. Try again.");
+                    System.out.println();
+                }
+                else {
+                    primaryKeyMap.put(pos, key);
+                    break;
+                }
+            }
+        }
+        return primaryKeyMap;
     }
 
     private void printResultSet(ArrayList<AttributeMetadata> attributeMetadataList, List<Record> resultSet) {

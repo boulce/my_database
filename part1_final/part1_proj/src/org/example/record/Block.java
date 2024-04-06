@@ -107,34 +107,4 @@ public class Block {
         }
         return blockBytes;
     }
-
-//    public byte[] getRecordByteArray(int recordIdx) {
-//        if(recordIdx >= BlockingFactor.VAL) {
-//            throw new RuntimeException();
-//        }
-//
-//        int recordSize = records[0].getSize();
-//
-//        byte[] recordBytes = new byte[recordSize];
-//
-//        // Write Attribute to recordBytes
-//        int attIdx = 0;
-//        for (char[] att : records[recordIdx].getAttributes()) {
-//            byte[] attBytes = new byte[att.length];
-//
-//            for (int j = 0; j < att.length; j++) {
-//                attBytes[j] = (byte) att[j];
-//            }
-//
-//            for (int j = 0; j < attBytes.length; j++, attIdx++) {
-//                recordBytes[attIdx] = attBytes[j];
-//            }
-//        }
-//
-//        byte[] linkBytes = intToByteArray(records[recordIdx].getLink());
-//        for (int j = 0; j < linkBytes.length; j++, attIdx++) {
-//            recordBytes[attIdx] = linkBytes[j];
-//        }
-//        return recordBytes;
-//    }
 }

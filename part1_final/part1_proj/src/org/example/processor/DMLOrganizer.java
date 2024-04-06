@@ -2,21 +2,17 @@ package org.example.processor;
 
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
-import org.example.record.BlockingFactor;
 import org.example.record.Record;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
-
-import static org.example.processor.QueryEvaluationEngine.getRecordsForSelectAll;
-import static org.example.record.NullConst.isNullAttribute;
 
 public class DMLOrganizer {
     public boolean isValidRelationMetatdata(Connection conn, String relationName, RelationMetadata relationMetadata) throws SQLException {
@@ -77,6 +73,15 @@ public class DMLOrganizer {
         return resultSet;
     }
 
+    public List<Record> getResultSetForSelectOne(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, HashMap<Integer, String> primaryKeyMap) throws IOException {
+        int recordSize = getRecordSize(attributeMetadataList);
+
+        QueryEvaluationEngine queryEvaluationEngine = new QueryEvaluationEngine();
+        List<Record> resultSet = queryEvaluationEngine.getRecordsForSelectOne(relationMetadata, attributeMetadataList, recordSize, primaryKeyMap);
+
+        return resultSet;
+    }
+
     private static int getRecordSize(ArrayList<AttributeMetadata> attributeMetadataList) {
         int recordSize = 0;
         for (AttributeMetadata attributeMetadata : attributeMetadataList) {
@@ -86,7 +91,7 @@ public class DMLOrganizer {
         return recordSize;
     }
 
-    private static ArrayList<Integer> getAttPosOfPrimaryKey(ArrayList<AttributeMetadata> attributeMetadataList) {
+    public ArrayList<Integer> getAttPosOfPrimaryKey(ArrayList<AttributeMetadata> attributeMetadataList) {
         ArrayList<Integer> attPosOfPrimaryKey = new ArrayList<>();
         for (AttributeMetadata attributeMetadata : attributeMetadataList) {
             if(attributeMetadata.isPrimary()) {
