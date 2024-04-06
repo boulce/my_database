@@ -3,6 +3,7 @@ package org.example.ui;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.processor.DDLInterpreter;
+import org.example.processor.DMLOrganizer;
 import org.example.record.Block;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
@@ -14,7 +15,9 @@ import java.sql.*;
 import java.util.*;
 
 import static org.example.db.Config.*;
+import static org.example.processor.DMLOrganizer.*;
 import static org.example.record.NullConst.NULL_LINK;
+import static org.example.record.NullConst.isNullAttribute;
 import static org.example.util.ByteUtil.*;
 
 public class TextUI {
@@ -30,6 +33,7 @@ public class TextUI {
 
         Connection conn = null;
         DDLInterpreter ddlInterpreter = new DDLInterpreter();
+        DMLOrganizer dmlOrganizer = new DMLOrganizer();
         try {
             conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASSWORD);
             System.out.println();
@@ -68,20 +72,7 @@ public class TextUI {
                         System.out.println();
 
                         // Check primary key constraint
-                        PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM relation_metadata WHERE relation_name = ?");
-                        pstmt.setString(1, relationName);
-                        ResultSet rs = pstmt.executeQuery();
-
-                        boolean exist = rs.next();
-                        if (exist) {
-                            relationMetadata.setRelationName(rs.getString(1));
-                            relationMetadata.setNumberOfAttributes(rs.getInt(2));
-                            relationMetadata.setStorageOrganization(rs.getString(3));
-                            relationMetadata.setLocation(rs.getString(4));
-                        }
-
-                        rs.close();
-                        pstmt.close();
+                        boolean exist = dmlOrganizer.isValidRelationMetatdata(conn, relationName, relationMetadata);
 
                         if(!exist) {
                             System.out.println("[ERROR] There isn't the relation that has same name '" + relationName + "'. Try again.");
@@ -92,7 +83,7 @@ public class TextUI {
                     }
 
                     // Get attribute metadata list
-                    ArrayList<AttributeMetadata> attributeMetadataList = getAttributeMetadataForQuery(conn, relationMetadata);
+                    ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
 
                     List<char[]> tuple = new ArrayList<>();
                     // Enter attribute information
@@ -197,18 +188,12 @@ public class TextUI {
 
                 } else if (Objects.equals(command, "4")) {
                     // Get relation metadata
-                    RelationMetadata relationMetadata = getValidMetadata(scanner, conn);
+                    RelationMetadata relationMetadata = getValidRelationMetadata(scanner, conn, dmlOrganizer);
 
                     // Get attribute metadata list
-                    ArrayList<AttributeMetadata> attributeMetadataList = getAttributeMetadataForQuery(conn, relationMetadata);
+                    ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
 
-                    int recordSize = getRecordSize(attributeMetadataList);
-
-                    // Get the attribute position of primary key
-                    // This will be used for judging deleted records and sorting the result set
-                    ArrayList<Integer> attPosOfPrimaryKey = getAttPosOfPrimaryKey(attributeMetadataList);
-
-                    List<Record> resultSet = getResultSetForSelectAll(relationMetadata, recordSize, attributeMetadataList, attPosOfPrimaryKey);
+                    List<Record> resultSet = dmlOrganizer.getResultSetForSelectAll(relationMetadata, attributeMetadataList);
 
                     // Print the result set
                     printResultSet(attributeMetadataList, resultSet);
@@ -409,18 +394,9 @@ public class TextUI {
         return attributeMetadataList;
     }
 
-    private boolean isNullAttribute(char[] attribute) {
-        for (char c : attribute) {
-            if(c != 0) {
-                return false;
-            }
-        }
-        return true;
-    }
-
-    private static RelationMetadata getValidMetadata(Scanner scanner, Connection conn) throws SQLException {
+    private static RelationMetadata getValidRelationMetadata(Scanner scanner, Connection conn, DMLOrganizer dmlOrganizer) throws SQLException {
         RelationMetadata relationMetadata = new RelationMetadata();
-        while(true) {
+        while (true) {
             String relationName;
 
             System.out.printf("Enter the relation name from which you select all tuple: ");
@@ -429,136 +405,16 @@ public class TextUI {
             System.out.println();
 
             // Check primary key constraint
-            PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM relation_metadata WHERE relation_name = ?");
-            pstmt.setString(1, relationName);
-            ResultSet rs = pstmt.executeQuery();
+            boolean exist = dmlOrganizer.isValidRelationMetatdata(conn, relationName, relationMetadata);
 
-            boolean exist = rs.next();
-            if (exist) {
-                relationMetadata.setRelationName(rs.getString(1));
-                relationMetadata.setNumberOfAttributes(rs.getInt(2));
-                relationMetadata.setStorageOrganization(rs.getString(3));
-                relationMetadata.setLocation(rs.getString(4));
-            }
-
-            rs.close();
-            pstmt.close();
-
-            if(!exist) {
+            if (!exist) {
                 System.out.println("[ERROR] There isn't the relation that has same name '" + relationName + "'. Try again.");
                 System.out.println();
-            } else{
+            } else {
                 break;
             }
         }
         return relationMetadata;
-    }
-
-    private static ArrayList<AttributeMetadata> getAttributeMetadataForQuery(Connection conn, RelationMetadata relationMetadata) throws SQLException {
-        ArrayList<AttributeMetadata> attributeMetadataList = new ArrayList<>();
-
-        PreparedStatement pstmt = conn.prepareStatement("SELECT * FROM attribute_metadata WHERE relation_name = ? ORDER BY position");
-        pstmt.setString(1, relationMetadata.getRelationName());
-        ResultSet rs = pstmt.executeQuery();
-
-        while(rs.next()) {
-            String relationName = rs.getString(1);
-            String attributeName = rs.getString(2);
-            String domainType = rs.getString(3);
-            int position = rs.getInt(4);
-            int length = rs.getInt(5);
-            boolean isPrimary = rs.getBoolean(6);
-            String referenceRelationName = rs.getString(7);
-            String referenceAttributeName = rs.getString(8);
-            AttributeMetadata attributeMetadata = new AttributeMetadata(relationName, attributeName, domainType, position, length, isPrimary, referenceRelationName, referenceAttributeName);
-            attributeMetadataList.add(attributeMetadata);
-        }
-
-        rs.close();
-        pstmt.close();
-        return attributeMetadataList;
-    }
-
-    private static int getRecordSize(ArrayList<AttributeMetadata> attributeMetadataList) {
-        int recordSize = 0;
-        for (AttributeMetadata attributeMetadata : attributeMetadataList) {
-            recordSize += attributeMetadata.getLength();
-        }
-        recordSize += 4;
-        return recordSize;
-    }
-
-    private static ArrayList<Integer> getAttPosOfPrimaryKey(ArrayList<AttributeMetadata> attributeMetadataList) {
-        ArrayList<Integer> attPosOfPrimaryKey = new ArrayList<>();
-        for (AttributeMetadata attributeMetadata : attributeMetadataList) {
-            if(attributeMetadata.isPrimary()) {
-                attPosOfPrimaryKey.add(attributeMetadata.getPosition());
-            }
-        }
-        return attPosOfPrimaryKey;
-    }
-
-    private List<Record> getResultSetForSelectAll(RelationMetadata relationMetadata, int recordSize, ArrayList<AttributeMetadata> attributeMetadataList, ArrayList<Integer> attPosOfPrimaryKey) throws IOException {
-        List<Record> resultSet = new ArrayList<>(); // This result set will save the records to show to user
-
-        // Read from the file
-        RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
-        while(true) {
-            int blockSize = recordSize * BlockingFactor.VAL;
-
-            byte[] readBlockBytes = new byte[blockSize];
-            int readCnt = input.read(readBlockBytes);
-
-            if(readCnt == -1) { // EOF
-                break;
-            }
-
-            for(int i = 0; i < BlockingFactor.VAL; i++) {
-                byte[] recordBytes = new byte[recordSize];
-                for(int j = 0; j < recordSize; j++) {
-                    recordBytes[j] = readBlockBytes[i* recordSize +j];
-                }
-                Record readRecord = new Record(recordBytes, attributeMetadataList);
-
-                // If some attribute of primary-key of a record is NULL, it is a deleted record.
-                // So don't contain the deleted record to the result set
-                boolean isDeleted = false;
-                for(int pos : attPosOfPrimaryKey) {
-                    if (isNullAttribute(readRecord.getAttributes().get(pos))){
-                        isDeleted = true;
-                        break;
-                    }
-                }
-                if(!isDeleted) {
-                    resultSet.add(readRecord);
-                }
-            }
-        }
-        input.close();
-
-        // sort result set by primary key as ascending order
-        sortResultSetByAttributes(attPosOfPrimaryKey, resultSet);
-        return resultSet;
-    }
-
-    private static void sortResultSetByAttributes(ArrayList<Integer> attPosOfPrimaryKey, List<Record> resultSet) {
-        resultSet.sort(new Comparator<Record>() {
-            @Override
-            public int compare(Record a, Record b) {
-                for (Integer pos : attPosOfPrimaryKey) {
-                    String valA = new String(a.getAttributes().get(pos));
-                    String valB = new String(b.getAttributes().get(pos));
-
-                    if(valA.compareTo(valB) < 0) {
-                        return -1;
-                    } else if (valA.compareTo(valB) > 0) {
-                        return 1;
-                    }
-                }
-
-                return 0; // It won't occur, because the same there won't be same primary key records
-            }
-        });
     }
 
     private void printResultSet(ArrayList<AttributeMetadata> attributeMetadataList, List<Record> resultSet) {
