@@ -2,6 +2,7 @@
 2024 Spring Database System Assignment Repository
 
 -part1 설계 변경사항
+* 생성할 테이블의 외래키는 고려하지 않는다.
 * char배열과, int link를 byte 배열로 변환하여 한 번에 블록단위로 .txt파일이 아니라 .tbl 바이너리 파일에 출력한다.
 * 테스트 시나리오에서 primary key 오름차순으로 정렬하는데, 숫자 크기 오름차순이 아니라 문자열 사전순 오름차순이므로 id10이 id9 다음이 아니라 id1 다음에 오게된다.
 
