@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class DDLInterpreter {
-    public static void createRelation(Connection conn, RelationMetadata relationMetadata, List<AttributeMetadata> attributeMetadataList) throws IOException, SQLException {
+    public void createRelation(Connection conn, RelationMetadata relationMetadata, List<AttributeMetadata> attributeMetadataList) throws IOException, SQLException {
         // Create new block
         Block nullBlock = getBlock(attributeMetadataList);
 
