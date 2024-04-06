@@ -60,28 +60,8 @@ public class TextUI {
                     ddlInterpreter.createRelation(conn, relationMetadata, attributeMetadataList);
 
                 } else if (Objects.equals(command, "2")) {
-                    //TODO insert refactoring
-
                     // Get relation metadata
-                    RelationMetadata relationMetadata = new RelationMetadata();
-                    while(true) {
-                        String relationName;
-
-                        System.out.printf("Enter the relation name to which you insert a tuple: ");
-                        relationName = scanner.next();
-                        relationName = relationName.toLowerCase();
-                        System.out.println();
-
-                        // Check primary key constraint
-                        boolean exist = dmlOrganizer.isValidRelationMetatdata(conn, relationName, relationMetadata);
-
-                        if(!exist) {
-                            System.out.println("[ERROR] There isn't the relation that has same name '" + relationName + "'. Try again.");
-                            System.out.println();
-                        } else{
-                            break;
-                        }
-                    }
+                    RelationMetadata relationMetadata = getValidRelationMetadata(scanner, conn, dmlOrganizer);
 
                     // Get attribute metadata list
                     ArrayList<AttributeMetadata> attributeMetadataList = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadata);
@@ -90,116 +70,9 @@ public class TextUI {
                     List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
 
                     // Enter attribute information
-                    List<char[]> tuple = null;
-                    while(true) {
-                        tuple = new ArrayList<>();
-                        for (AttributeMetadata attributeMetadata : attributeMetadataList) {
-                            String valStr;
-                            char[] val = new char[attributeMetadata.getLength()];
+                    Record recordToInsert = getRecordToInsert(attributeMetadataList, scanner, attPosOfPrimaryKey, dmlOrganizer, relationMetadata);
 
-                            while(true) {
-                                System.out.printf("Enter the value of attribute '" + attributeMetadata.getAttributeName() + "' (type: "+attributeMetadata.getDomainType()+", length: "+attributeMetadata.getLength()+"): ");
-                                valStr = scanner.next();
-                                System.out.println();
-
-                                if(valStr.length() > attributeMetadata.getLength()) {
-                                    System.out.println("[ERROR] Your input is bigger than the attribute size. Try again.");
-                                    System.out.println();
-                                }
-                                else {
-                                    break;
-                                }
-                            }
-
-                            for(int i = 0; i < valStr.length(); i++) {
-                                val[i] = valStr.charAt(i);
-                            }
-                            tuple.add(val);
-                        }
-
-                        // Check the primary key constraint
-                        List<char[]> finalTuple = tuple;
-                        Map<Integer, String> primaryKeyMap = attPosOfPrimaryKey.stream().collect(Collectors.toMap(pos -> pos, pos -> new String(finalTuple.get(pos)).trim()));
-                        List<Record> resultSet = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
-
-                        if(!resultSet.isEmpty()) {
-                            System.out.println("[ERROR] You entered duplicated primary key. Please try again");
-                        } else {
-                            break;
-                        }
-                        System.out.println();
-                    }
-
-                    Record recordToInsert = new Record(tuple, 0);
-
-                    // Read the header block in the file
-                    RandomAccessFile file = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "rw");
-                    int recordSize = recordToInsert.getSize();
-                    int blockSize = recordSize * BlockingFactor.VAL;
-                    byte[] readBlockBytes = new byte[blockSize];
-                    file.read(readBlockBytes);
-
-                    Block headerBlock = new Block(0, readBlockBytes, attributeMetadataList);
-
-                    // Get header link
-                    int headerLink = headerBlock.getRecords()[0].getLink();
-
-                    if(headerLink == NULL_LINK) {
-                        Block newBlock = new Block((int) (file.length() / blockSize), DDLInterpreter.getAttChars(attributeMetadataList));
-
-                        // Assign link of target record to header's link
-                        headerBlock.getRecords()[0].setLink(newBlock.getRecords()[0].getLink());
-                        newBlock.getRecords()[0] = recordToInsert;
-                        // Write the header block and new block that contains the record to be inserted to the file
-                        file.seek(0);
-                        file.write(headerBlock.getByteArray());
-
-                        file.seek(file.length());
-                        file.write(newBlock.getByteArray());
-                    } else {
-                        // Find the block of the record to which insert a new record
-                        int nextBlockIdx = headerLink / blockSize; // Block Idx that header points
-                        if(nextBlockIdx == headerBlock.getIdx()) { // Next record that header point is in header block
-                            int recordOffset = headerLink;
-                            int recordIdx = recordOffset / recordSize;
-                            // Assign link of target record to header's link
-                            headerBlock.getRecords()[0].setLink(headerBlock.getRecords()[recordIdx].getLink());
-
-                            // Insert a new record to target record position
-                            headerBlock.getRecords()[recordIdx] = recordToInsert;
-
-                            // Write header block to the file
-                            file.seek(headerBlock.getIdx() * blockSize);
-                            file.write(headerBlock.getByteArray());
-                            file.close();
-                        } else { // Next record that header point isn' in header block
-                            int recordOffset = headerLink - nextBlockIdx*blockSize;
-                            int recordIdx = recordOffset / recordSize;
-
-                            // Read the block to which insert a new block
-                            file.seek(nextBlockIdx*blockSize);
-                            file.read(readBlockBytes);
-
-                            Block targetBlock = new Block(nextBlockIdx, readBlockBytes, attributeMetadataList);
-
-                            // Assign link of target record to header's link
-                            headerBlock.getRecords()[0].setLink(targetBlock.getRecords()[recordIdx].getLink());
-
-                            // Insert a new record to target record position
-                            targetBlock.getRecords()[recordIdx] = recordToInsert;
-
-                            // Write header block to the file
-                            file.seek(headerBlock.getIdx() * blockSize);
-                            file.write(headerBlock.getByteArray());
-
-                            // Write target block to the file
-                            file.seek(targetBlock.getIdx() * blockSize);
-                            file.write(targetBlock.getByteArray());
-
-                            file.close();
-                        }
-                        file.close();
-                    }
+                    dmlOrganizer.insertRecord(relationMetadata, recordToInsert, attributeMetadataList);
 
                 } else if (Objects.equals(command, "3")) {
 
@@ -535,6 +408,51 @@ public class TextUI {
         }
         System.out.print("┘");
         System.out.println();
+    }
+
+    private static Record getRecordToInsert(ArrayList<AttributeMetadata> attributeMetadataList, Scanner scanner, List<Integer> attPosOfPrimaryKey, DMLOrganizer dmlOrganizer, RelationMetadata relationMetadata) throws IOException {
+        List<char[]> tuple = null;
+        while(true) {
+            tuple = new ArrayList<>();
+            for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                String valStr;
+                char[] val = new char[attributeMetadata.getLength()];
+
+                while(true) {
+                    System.out.printf("Enter the value of attribute '" + attributeMetadata.getAttributeName() + "' (type: "+attributeMetadata.getDomainType()+", length: "+attributeMetadata.getLength()+"): ");
+                    valStr = scanner.next();
+                    System.out.println();
+
+                    if(valStr.length() > attributeMetadata.getLength()) {
+                        System.out.println("[ERROR] Your input is bigger than the attribute size. Try again.");
+                        System.out.println();
+                    }
+                    else {
+                        break;
+                    }
+                }
+
+                for(int i = 0; i < valStr.length(); i++) {
+                    val[i] = valStr.charAt(i);
+                }
+                tuple.add(val);
+            }
+
+            // Check the primary key constraint
+            List<char[]> finalTuple = tuple;
+            Map<Integer, String> primaryKeyMap = attPosOfPrimaryKey.stream().collect(Collectors.toMap(pos -> pos, pos -> new String(finalTuple.get(pos)).trim()));
+            List<Record> resultSet = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
+
+            if(!resultSet.isEmpty()) {
+                System.out.println("[ERROR] You entered duplicated primary key. Please try again");
+            } else {
+                break;
+            }
+            System.out.println();
+        }
+
+        Record recordToInsert = new Record(tuple, 0);
+        return recordToInsert;
     }
 
 }
