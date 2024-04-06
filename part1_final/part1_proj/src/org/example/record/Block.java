@@ -24,14 +24,14 @@ public class Block {
         this.idx = idx;
         records = new Record[BlockingFactor.VAL];
 
-        Record nullRecord = new Record(attChars, 0);
+        Record record = new Record(attChars, 0);
 
         for(int i = 0; i < records.length; i++) {
-            records[i] = nullRecord.copyFactory();
+            records[i] = record.copyFactory();
         }
 
         // Init the link. link of i-th record points (i+1)-th record
-        int recordSize = nullRecord.getSize();
+        int recordSize = record.getSize();
         int blockSize = recordSize * BlockingFactor.VAL;
         for(int i = 0; i < records.length-1; i++) {
             records[i].setLink(idx * blockSize + recordSize * (i+1));

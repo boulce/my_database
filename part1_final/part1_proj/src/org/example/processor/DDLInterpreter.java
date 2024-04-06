@@ -69,7 +69,7 @@ public class DDLInterpreter {
         pstmt.close();
     }
 
-    private static List<char[]> getAttChars(List<AttributeMetadata> attributeMetadataList) {
+    public static List<char[]> getAttChars(List<AttributeMetadata> attributeMetadataList) {
         List<char[]> attChars = new ArrayList<>();
 
         for (AttributeMetadata att : attributeMetadataList) {

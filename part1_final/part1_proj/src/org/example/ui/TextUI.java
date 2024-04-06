@@ -147,12 +147,11 @@ public class TextUI {
 
                     // TODO free_list 헤더에 넣기 or 새로운 블록 삽입해서 넣기 로직 구현해야함
                     // Read the header block in the file
-                    RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
+                    RandomAccessFile file = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "rw");
                     int recordSize = recordToInsert.getSize();
                     int blockSize = recordSize * BlockingFactor.VAL;
                     byte[] readBlockBytes = new byte[blockSize];
-                    input.read(readBlockBytes);
-                    input.close();
+                    file.read(readBlockBytes);
 
                     Block headerBlock = new Block(0, readBlockBytes, attributeMetadataList);
 
@@ -160,7 +159,17 @@ public class TextUI {
                     int headerLink = headerBlock.getRecords()[0].getLink();
 
                     if(headerLink == NULL_LINK) {
-                        System.out.println("!!!");
+                        Block newBlock = new Block((int) (file.length() / blockSize), DDLInterpreter.getAttChars(attributeMetadataList));
+
+                        // Assign link of target record to header's link
+                        headerBlock.getRecords()[0].setLink(newBlock.getRecords()[0].getLink());
+                        newBlock.getRecords()[0] = recordToInsert;
+                        // Write the header block and new block that contains the record to be inserted to the file
+                        file.seek(0);
+                        file.write(headerBlock.getByteArray());
+
+                        file.seek(file.length());
+                        file.write(newBlock.getByteArray());
                     } else {
                         // Find the block of the record to which insert a new record
                         int nextBlockSeq = headerLink / blockSize; // Block Idx that header points
@@ -174,13 +183,13 @@ public class TextUI {
                             headerBlock.getRecords()[recordIdx] = recordToInsert;
 
                             // Write header block to the file
-                            RandomAccessFile output = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "rw");
-                            output.seek(headerBlock.getIdx() * blockSize);
-                            output.write(headerBlock.getByteArray());
-                            output.close();
+                            file.seek(headerBlock.getIdx() * blockSize);
+                            file.write(headerBlock.getByteArray());
+                            file.close();
                         } else {
-
+                            // TODO
                         }
+                        file.close();
                         // 헤더의 링크에 해당 레코드의 링크를 대입한다
                         // 해당 레코드에 입력한 레코드를 삽입한다.
                         // 해당 블럭과 헤더 블럭을 파일에 쓴다. (만약 해당 블럭이 헤더 블럭이면 헤더 블럭만 쓴다)
