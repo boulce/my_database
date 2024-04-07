@@ -2,19 +2,14 @@ package org.example.processor;
 
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
-import org.example.record.Block;
-import org.example.record.BlockingFactor;
 import org.example.record.Record;
 
 import java.io.IOException;
-import java.io.RandomAccessFile;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
-
-import static org.example.record.NullConst.NULL_LINK;
 
 public class DMLOrganizer {
     public boolean isValidRelationMetatdata(Connection conn, String relationName, RelationMetadata relationMetadata) throws SQLException {
@@ -89,7 +84,13 @@ public class DMLOrganizer {
         queryEvaluationEngine.processInsertQuery(relationMetadata, recordToInsert, attributeMetadataList);
     }
 
-    private static int getRecordSize(ArrayList<AttributeMetadata> attributeMetadataList) {
+    public void deleteRecord(RelationMetadata relationMetadata, ArrayList<AttributeMetadata> attributeMetadataList, HashMap<Integer, String> primaryKeyMap) throws IOException {
+        QueryEvaluationEngine queryEvaluationEngine = new QueryEvaluationEngine();
+
+        queryEvaluationEngine.processDeleteQuery(relationMetadata, attributeMetadataList, primaryKeyMap);
+    }
+
+    static int getRecordSize(ArrayList<AttributeMetadata> attributeMetadataList) {
         int recordSize = 0;
         for (AttributeMetadata attributeMetadata : attributeMetadataList) {
             recordSize += attributeMetadata.getLength();
