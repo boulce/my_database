@@ -276,11 +276,8 @@ public class TextUI {
                     System.out.println("[ERROR] Not supported reference relation Name. Try again.");
                     System.out.println();
                 } else {
-                    break;
-                }
-
-                if(Objects.equals(referenceRelationName.toUpperCase(), "NULL")) {
                     referenceRelationName = null;
+                    break;
                 }
             }
 
@@ -293,11 +290,8 @@ public class TextUI {
                     System.out.println("[ERROR] Not supported reference attribute Name. Try again.");
                     System.out.println();
                 } else {
-                    break;
-                }
-
-                if(Objects.equals(referenceAttributeName.toUpperCase(), "NULL")) {
                     referenceRelationName = null;
+                    break;
                 }
             }
 
