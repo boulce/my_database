@@ -10,7 +10,7 @@ import static org.example.util.ByteUtil.intToByteArray;
 
 public class Block {
     int idx;
-    Record records[];
+    Record[] records;
 
     public int getIdx() {
         return idx;
