@@ -150,7 +150,7 @@ public class QueryEvaluationEngine {
                 file.seek(headerBlock.getIdx() * blockSize);
                 file.write(headerBlock.getByteArray());
                 file.close();
-            } else { // Next record that header point isn' in header block
+            } else { // Next record that header point isn't in header block
                 int recordOffset = headerLink - nextBlockIdx*blockSize;
                 int recordIdx = recordOffset / recordSize;
 
