@@ -306,7 +306,7 @@ public class TextUI {
         while (true) {
             String relationName;
 
-            System.out.printf("Enter the relation name from which you select all tuple: ");
+            System.out.printf("Enter the relation name: ");
             relationName = scanner.next();
             relationName = relationName.toLowerCase();
             System.out.println();
