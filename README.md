@@ -16,5 +16,5 @@
 
 -시간되면 개선해볼점
 * Record에 블록의 몇번째 인덱스인지 저장해서, 따로 반복문 돌때 몇번째 레코드를 보고 있는지에 대한 변수를 밖으로 안빼도 되도록 하기
-* byte에 직접 접근하는 코드가 있다면 Record, Block 클래스로 변경해서 접근하기
+* byte에 직접 접근하는 코드가 있다면 Record, Block 클래스로 변경해서 접근하기(Done)
 * 삭제로직에서 headerBlock과 readBlock 같을때 headerBlock이 바로 readBlock을 가리키도록 변경하기

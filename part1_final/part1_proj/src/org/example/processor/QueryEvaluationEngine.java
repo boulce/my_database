@@ -49,7 +49,6 @@ public class QueryEvaluationEngine {
                     }
                 }
                 if(!isDeleted) {
-                    System.out.println("!!");
                     resultSet.add(readRecord);
                 }
             }
