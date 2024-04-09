@@ -23,7 +23,7 @@ public class DDLInterpreter {
         saveRelationMetadata(conn, relationMetadata);
 
         // Insert attribute metadata
-        saveAttribteMetadata(attributeMetadataList, conn);
+        saveAttributeMetadata(attributeMetadataList, conn);
     }
 
     private static Block getBlock(List<AttributeMetadata> attributeMetadataList) {
@@ -51,7 +51,7 @@ public class DDLInterpreter {
         pstmt.close();
     }
 
-    private static void saveAttribteMetadata(List<AttributeMetadata> attributeMetadataList, Connection conn) throws SQLException {
+    private static void saveAttributeMetadata(List<AttributeMetadata> attributeMetadataList, Connection conn) throws SQLException {
         String attInsertSQL = "insert into attribute_metadata(relation_name, attribute_name, domain_type, position, length, is_primary, reference_relation_name, reference_attribute_name) values(?, ?, ?, ?, ?, ?, ?, ?)";
         PreparedStatement pstmt = conn.prepareStatement(attInsertSQL);
 
