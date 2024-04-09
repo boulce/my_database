@@ -24,22 +24,20 @@ public class QueryEvaluationEngine {
 
         // Read from the file
         RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
+        int blockIdx = 0;
         while(true) {
             int blockSize = recordSize * BlockingFactor.VAL;
 
             byte[] readBlockBytes = new byte[blockSize];
             int readCnt = input.read(readBlockBytes);
+            Block readBlock = new Block(blockIdx++, readBlockBytes, attributeMetadataList);
 
             if(readCnt == -1) { // EOF
                 break;
             }
 
             for(int i = 0; i < BlockingFactor.VAL; i++) {
-                byte[] recordBytes = new byte[recordSize];
-                for(int j = 0; j < recordSize; j++) {
-                    recordBytes[j] = readBlockBytes[i* recordSize +j];
-                }
-                Record readRecord = new Record(recordBytes, attributeMetadataList);
+                Record readRecord = readBlock.getRecords()[i];
 
                 // If some attribute of primary-key of a record is NULL, it is a deleted record.
                 // So don't contain the deleted record to the result set
@@ -51,6 +49,7 @@ public class QueryEvaluationEngine {
                     }
                 }
                 if(!isDeleted) {
+                    System.out.println("!!");
                     resultSet.add(readRecord);
                 }
             }
@@ -64,22 +63,21 @@ public class QueryEvaluationEngine {
 
         // Read from the file
         RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
+
+        int blockIdx = 0;
         while(true) {
             int blockSize = recordSize * BlockingFactor.VAL;
 
             byte[] readBlockBytes = new byte[blockSize];
             int readCnt = input.read(readBlockBytes);
+            Block readBlock = new Block(blockIdx++, readBlockBytes, attributeMetadataList);
 
             if(readCnt == -1) { // EOF
                 break;
             }
 
             for(int i = 0; i < BlockingFactor.VAL; i++) {
-                byte[] recordBytes = new byte[recordSize];
-                for(int j = 0; j < recordSize; j++) {
-                    recordBytes[j] = readBlockBytes[i* recordSize +j];
-                }
-                Record readRecord = new Record(recordBytes, attributeMetadataList);
+                Record readRecord = readBlock.getRecords()[i];
 
                 // If some attribute of primary-key of a record is NULL, it is a deleted record.
                 // So don't contain the deleted record to the result set
