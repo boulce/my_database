@@ -1,14 +1,18 @@
 package org.example.ui;
 
+import org.example.buffer.BufferPage;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.processor.DDLInterpreter;
 import org.example.processor.DMLOrganizer;
+import org.example.record.Block;
+import org.example.record.BlockingFactor;
 import org.example.record.Record;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
+import java.io.RandomAccessFile;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -117,12 +121,12 @@ public class TextUI {
                 } else if (Objects.equals(command, "6")) {
 
                     RelationMetadata[] relationMetadataArr = new RelationMetadata[2];
-                    ArrayList<AttributeMetadata>[] attributeMetadataArr = new ArrayList[relationMetadataArr.length];
+                    ArrayList<AttributeMetadata>[] attributeMetadataListArr = new ArrayList[relationMetadataArr.length];
 
                     // Get relations to join
                     for(int i = 0; i < relationMetadataArr.length; i++) {
                         relationMetadataArr[i] = getValidRelationMetadata(scanner, conn, dmlOrganizer); // Get relation metadata
-                        attributeMetadataArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
+                        attributeMetadataListArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
                     }
 
                     List<String> joinAttr = new ArrayList<>();
@@ -132,7 +136,7 @@ public class TextUI {
                     }
 
                     int joinAttCnt;
-                    System.out.println("Enter the number of join column...");
+                    System.out.printf("Enter the number of join column: ");
                     joinAttCnt = scanner.nextInt();
                     scanner.nextLine();
                     System.out.println();
@@ -140,7 +144,7 @@ public class TextUI {
                     for(int i = 0; i < joinAttCnt; i++) {
                         String jointAttrName;
                         while(true) {
-                            System.out.println("Enter the name of join column[" + i +"]...");
+                            System.out.printf("Enter the name of join column[" + i + "]: ");
                             jointAttrName = scanner.nextLine();
                             System.out.println();
 
@@ -160,7 +164,7 @@ public class TextUI {
 
                                 for(int j = 0; j < relationMetadataArr.length; j++) {
                                     boolean found = false;
-                                    List<AttributeMetadata> attributeMetadata = attributeMetadataArr[j];
+                                    List<AttributeMetadata> attributeMetadata = attributeMetadataListArr[j];
                                     for(int k = 0; k < attributeMetadata.size(); k++) {
                                         String attName = attributeMetadata.get(k).getAttributeName();
                                         if(jointAttrName.equals(attName)) {
@@ -188,18 +192,16 @@ public class TextUI {
                                 }
                             }
                         }
-                        System.out.println();
                     }
 
-                    // TODO
-//                    // Get the attribute position of primary key
-//                    List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
-//
-//                    HashMap<Integer, String> primaryKeyMap = getPrimaryKeyMapForSearch(attPosOfPrimaryKey, attributeMetadataList, scanner);
-//
-//                    List<Record> resultSetForSelectOne = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
-//
-//                    printResultSet(attributeMetadataList, resultSetForSelectOne);
+
+                    // TODO Partitioning
+                    dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
+
+                    // TODO Join
+
+                    // TODO Print
+
 
                 } else if (Objects.equals(command, "0")) {
                     System.out.println("Stop My Database.......");
