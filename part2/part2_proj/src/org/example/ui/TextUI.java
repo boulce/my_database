@@ -124,6 +124,68 @@ public class TextUI {
                         relationMetadataArr[i] = getValidRelationMetadata(scanner, conn, dmlOrganizer); // Get relation metadata
                         attributeMetadataArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
                     }
+
+                    List<String> joinAttr = new ArrayList<>();
+                    HashMap<String, Integer>[] joinAttrPosArr = new HashMap[relationMetadataArr.length];
+
+                    int joinAttCnt;
+                    System.out.println("Enter the number of join column...");
+                    joinAttCnt = scanner.nextInt();
+                    System.out.println();
+
+                    for(int i = 0; i < joinAttCnt; i++) {
+                        String jointAttName;
+                        while(true) {
+                            System.out.println("Enter the name of join column[" + i +"]...");
+                            jointAttName = scanner.next();
+                            System.out.println();
+
+                            // Preventing duplicate join column
+                            String finalJointAttName = jointAttName;
+                            boolean isExisting = joinAttr.stream()
+                                    .anyMatch(att -> att.equals(finalJointAttName));
+
+                            if(isExisting) {
+                                System.out.println("[ERROR] You input duplicate join column. Please try again.");
+                                System.out.println();
+                                continue;
+                            } else {
+                                // Check the join column is existing at both two relation
+                                boolean bothExisting = true;
+                                int[] joinAttrPos = new int[relationMetadataArr.length];
+
+                                for(int j = 0; j < relationMetadataArr.length; j++) {
+                                    boolean found = false;
+                                    List<AttributeMetadata> attributeMetadata = attributeMetadataArr[j];
+                                    for(int k = 0; k < attributeMetadata.size(); k++) {
+                                        String attName = attributeMetadata.get(k).getAttributeName();
+                                        if(jointAttName.equals(attName)) {
+                                            found = true;
+                                            joinAttrPos[j] = k;
+                                            break;
+                                        }
+                                    }
+
+                                    if(!found){
+                                        System.out.println("[ERROR] The join column '" + joinAttr + "' doesn't exist on the relation '" + relationMetadataArr[j].getRelationName()+ ". Please try again");
+                                        System.out.println();
+                                        bothExisting = false;
+                                        break;
+                                    }
+                                }
+
+                                if(bothExisting) {
+                                    // Add to valid join column information to joinAttr, joinAttrPosArr
+                                    joinAttr.add(jointAttName);
+                                    for(int j = 0; j < relationMetadataArr.length; j++) {
+                                        joinAttrPosArr[j].put(jointAttName, joinAttrPos[j]);
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+
                     // TODO
 //                    // Get the attribute position of primary key
 //                    List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
