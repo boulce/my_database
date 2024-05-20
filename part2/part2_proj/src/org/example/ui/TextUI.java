@@ -45,7 +45,7 @@ public class TextUI {
                 System.out.println("--- 6. Join");
                 System.out.println("--- 0. Exit");
                 System.out.printf("Enter the command: ");
-                command = scanner.next();
+                command = scanner.nextLine();
                 System.out.println();
 
                 if (Objects.equals(command, "1")) {
@@ -127,21 +127,25 @@ public class TextUI {
 
                     List<String> joinAttr = new ArrayList<>();
                     HashMap<String, Integer>[] joinAttrPosArr = new HashMap[relationMetadataArr.length];
+                    for(int i = 0; i < joinAttrPosArr.length; i++) {
+                        joinAttrPosArr[i] = new HashMap<>();
+                    }
 
                     int joinAttCnt;
                     System.out.println("Enter the number of join column...");
                     joinAttCnt = scanner.nextInt();
+                    scanner.nextLine();
                     System.out.println();
 
                     for(int i = 0; i < joinAttCnt; i++) {
-                        String jointAttName;
+                        String jointAttrName;
                         while(true) {
                             System.out.println("Enter the name of join column[" + i +"]...");
-                            jointAttName = scanner.next();
+                            jointAttrName = scanner.nextLine();
                             System.out.println();
 
                             // Preventing duplicate join column
-                            String finalJointAttName = jointAttName;
+                            String finalJointAttName = jointAttrName;
                             boolean isExisting = joinAttr.stream()
                                     .anyMatch(att -> att.equals(finalJointAttName));
 
@@ -159,7 +163,7 @@ public class TextUI {
                                     List<AttributeMetadata> attributeMetadata = attributeMetadataArr[j];
                                     for(int k = 0; k < attributeMetadata.size(); k++) {
                                         String attName = attributeMetadata.get(k).getAttributeName();
-                                        if(jointAttName.equals(attName)) {
+                                        if(jointAttrName.equals(attName)) {
                                             found = true;
                                             joinAttrPos[j] = k;
                                             break;
@@ -167,7 +171,7 @@ public class TextUI {
                                     }
 
                                     if(!found){
-                                        System.out.println("[ERROR] The join column '" + joinAttr + "' doesn't exist on the relation '" + relationMetadataArr[j].getRelationName()+ ". Please try again");
+                                        System.out.println("[ERROR] The join column '" + jointAttrName + "' doesn't exist on the relation '" + relationMetadataArr[j].getRelationName()+ "'. Please try again");
                                         System.out.println();
                                         bothExisting = false;
                                         break;
@@ -176,14 +180,15 @@ public class TextUI {
 
                                 if(bothExisting) {
                                     // Add to valid join column information to joinAttr, joinAttrPosArr
-                                    joinAttr.add(jointAttName);
+                                    joinAttr.add(jointAttrName);
                                     for(int j = 0; j < relationMetadataArr.length; j++) {
-                                        joinAttrPosArr[j].put(jointAttName, joinAttrPos[j]);
+                                        joinAttrPosArr[j].put(jointAttrName, joinAttrPos[j]);
                                     }
                                     break;
                                 }
                             }
                         }
+                        System.out.println();
                     }
 
                     // TODO
@@ -227,7 +232,7 @@ public class TextUI {
         while(true) {
             System.out.println("Enter relation information...");
             System.out.printf("Enter the relation name: ");
-            relationName = scanner.next();
+            relationName = scanner.nextLine();
             relationName = relationName.toLowerCase();
             System.out.println();
 
@@ -255,11 +260,12 @@ public class TextUI {
 
         System.out.printf("Enter the storage number of attributes: ");
         numberOfAttributes = scanner.nextInt();
+        scanner.nextLine();
         System.out.println();
 
         while(true) {
             System.out.printf("Enter the storage organization: ");
-            storageOrganization = scanner.next();
+            storageOrganization = scanner.nextLine();
             System.out.println();
 
             if(!Objects.equals(storageOrganization, "free_list")) {
@@ -272,7 +278,7 @@ public class TextUI {
 
         while(true) {
             System.out.printf("Enter the location: ");
-            location = scanner.next();
+            location = scanner.nextLine();
             System.out.println();
 
             if(!Objects.equals(location, "./relation_file/")) {
@@ -300,7 +306,7 @@ public class TextUI {
 
             while(true) {
                 System.out.printf("Enter the attribute name: ");
-                attributeName = scanner.next();
+                attributeName = scanner.nextLine();
                 attributeName = attributeName.toLowerCase();
                 System.out.println();
 
@@ -323,7 +329,7 @@ public class TextUI {
 
             while(true) {
                 System.out.printf("Enter the domain type: ");
-                domainType = scanner.next();
+                domainType = scanner.nextLine();
                 System.out.println();
 
                 if(!Objects.equals(domainType, "char")) {
@@ -336,12 +342,13 @@ public class TextUI {
 
             System.out.printf("Enter the length: ");
             length = scanner.nextInt();
+            scanner.nextLine();
             System.out.println();
 
 
             String isPrimaryStr;
             System.out.printf("Answer whether it is primary key  (if it is true, enter 'yes'): ");
-            isPrimaryStr = scanner.next();
+            isPrimaryStr = scanner.nextLine();
             System.out.println();
 
             if(Objects.equals(isPrimaryStr, "yes")) {
@@ -352,7 +359,7 @@ public class TextUI {
 
             while(true){
                 System.out.printf("Enter the reference relation name (if you want null, enter 'NULL'): ");
-                referenceRelationName = scanner.next();
+                referenceRelationName = scanner.nextLine();
                 System.out.println();
 
                 if(!Objects.equals(referenceRelationName.toUpperCase(), "NULL")) {
@@ -366,7 +373,7 @@ public class TextUI {
 
             while(true){
                 System.out.printf("Enter the reference attribute name (if you want null, enter 'NULL'): ");
-                referenceAttributeName = scanner.next();
+                referenceAttributeName = scanner.nextLine();
                 System.out.println();
 
                 if(!Objects.equals(referenceAttributeName.toUpperCase(), "NULL")) {
@@ -390,7 +397,7 @@ public class TextUI {
             String relationName;
 
             System.out.printf("Enter the relation name: ");
-            relationName = scanner.next();
+            relationName = scanner.nextLine();
             relationName = relationName.toLowerCase();
             System.out.println();
 
@@ -413,7 +420,7 @@ public class TextUI {
         for (Integer pos : attPosOfPrimaryKey) {
             while(true) {
                 System.out.printf("Enter the search key of primary key attribute '" + attributeMetadataList.get(pos).getAttributeName() + "' (type: "+ attributeMetadataList.get(pos).getDomainType()+", length: " + attributeMetadataList.get(pos).getLength()+"): ");
-                String key = scanner.next();
+                String key = scanner.nextLine();
                 System.out.println();
 
                 if(key.length() > attributeMetadataList.get(pos).getLength()) {
@@ -435,7 +442,7 @@ public class TextUI {
         for (Integer pos : attPosOfPrimaryKey) {
             while(true) {
                 System.out.printf("Enter the search key of primary key attribute to delete '" + attributeMetadataList.get(pos).getAttributeName() + "' (type: "+ attributeMetadataList.get(pos).getDomainType()+", length: " + attributeMetadataList.get(pos).getLength()+"): ");
-                String key = scanner.next();
+                String key = scanner.nextLine();
                 System.out.println();
 
                 if(key.length() > attributeMetadataList.get(pos).getLength()) {
@@ -528,7 +535,7 @@ public class TextUI {
 
                 while(true) {
                     System.out.printf("Enter the value of attribute '" + attributeMetadata.getAttributeName() + "' (type: "+attributeMetadata.getDomainType()+", length: "+attributeMetadata.getLength()+"): ");
-                    valStr = scanner.next();
+                    valStr = scanner.nextLine();
                     System.out.println();
 
                     if(valStr.length() > attributeMetadata.getLength()) {
