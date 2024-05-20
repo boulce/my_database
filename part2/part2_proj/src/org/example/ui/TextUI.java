@@ -42,6 +42,7 @@ public class TextUI {
                 System.out.println("--- 3. Delete a tuple");
                 System.out.println("--- 4. Select all tuple");
                 System.out.println("--- 5. Select a tuple");
+                System.out.println("--- 6. Join");
                 System.out.println("--- 0. Exit");
                 System.out.printf("Enter the command: ");
                 command = scanner.next();
@@ -112,6 +113,26 @@ public class TextUI {
                     List<Record> resultSetForSelectOne = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
 
                     printResultSet(attributeMetadataList, resultSetForSelectOne);
+
+                } else if (Objects.equals(command, "6")) {
+
+                    RelationMetadata[] relationMetadataArr = new RelationMetadata[2];
+                    ArrayList<AttributeMetadata>[] attributeMetadataArr = new ArrayList[relationMetadataArr.length];
+
+                    // Get relations to join
+                    for(int i = 0; i < relationMetadataArr.length; i++) {
+                        relationMetadataArr[i] = getValidRelationMetadata(scanner, conn, dmlOrganizer); // Get relation metadata
+                        attributeMetadataArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
+                    }
+                    // TODO
+//                    // Get the attribute position of primary key
+//                    List<Integer> attPosOfPrimaryKey = dmlOrganizer.getAttPosOfPrimaryKey(attributeMetadataList);
+//
+//                    HashMap<Integer, String> primaryKeyMap = getPrimaryKeyMapForSearch(attPosOfPrimaryKey, attributeMetadataList, scanner);
+//
+//                    List<Record> resultSetForSelectOne = dmlOrganizer.getResultSetForSelectOne(relationMetadata, attributeMetadataList, primaryKeyMap);
+//
+//                    printResultSet(attributeMetadataList, resultSetForSelectOne);
 
                 } else if (Objects.equals(command, "0")) {
                     System.out.println("Stop My Database.......");
