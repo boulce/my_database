@@ -291,7 +291,7 @@ public class DMLOrganizer {
             ///////////////////////////////////////////////////////////////////// START OF JOIN
             List<Record> resultSet = new ArrayList<>();
             List<BufferPage> buildInputBuffPages = new ArrayList<>();
-            BufferPage probeInputBuffPages = new BufferPage();
+            BufferPage probeInputBuffPage;
 
             RelationMetadata relationMetadataBuild = relationMetadataS;
             RelationMetadata relationMetadataProbe = relationMetadataR;
@@ -305,22 +305,23 @@ public class DMLOrganizer {
             File[] temporaryFilesBuild = temporaryFilesS;
             File[] temporaryFilesProbe = temporaryFilesR;
 
-            recordSize = getRecordSizeExceptLink(attrMetadataListBuild);
+            int recordSizeBuild = getRecordSizeExceptLink(attrMetadataListBuild);
             for(int i = 0; i < PARTITION_CNT; i++) {
                 // Read BuildInput Partition to the Buffer
                 input = new RandomAccessFile(temporaryFilesBuild[i], "r");
 
                 while(true) {
-                    int blockSize = recordSize * BlockingFactor.VAL;
+                    int blockSize = recordSizeBuild * BlockingFactor.VAL;
 
                     byte[] readBlockBytes = new byte[blockSize];
                     int readCnt = input.read(readBlockBytes);
                     BufferPage readBlock = new BufferPage(readBlockBytes, attrMetadataListBuild);
-                    buildInputBuffPages.add(readBlock);
 
                     if(readCnt == -1) { // EOF
                         break;
                     }
+
+                    buildInputBuffPages.add(readBlock);
                 }
 
                 // Build hashIndex
@@ -345,9 +346,47 @@ public class DMLOrganizer {
                         bucket.add(record);
                     }
                 }
+                input.close();
+
+                // TODO Reading corresponding Probe input Partition
+                input = new RandomAccessFile(temporaryFilesProbe[i], "r");
+                int recordSizeProbe = getRecordSizeExceptLink(attrMetadataListProbe);
+
+                while(true) {
+                    int blockSize = recordSizeProbe * BlockingFactor.VAL;
+
+                    byte[] readBlockBytes = new byte[blockSize];
+                    int readCnt = input.read(readBlockBytes);
+                    probeInputBuffPage = new BufferPage(readBlockBytes, attrMetadataListProbe);
+
+                    if(readCnt == -1) { // EOF
+                        break;
+                    }
+
+                    // TODO Probe by using join attributes of probe input
+                    Record[] records = probeInputBuffPage.getRecords();
+                    for(int j = 0; j < probeInputBuffPage.getRecordCnt(); j++) {
+                        Record record = records[j];
+                        int joinHashCode = 0;
+                        List<char[]> attrList = record.getAttributes();
+                        for (String attr : joinAttr) { // Get the XORs of join column of record for building hash index
+                            int jointAttrPos = joinAttrPosProbe.get(attr);
+                            String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                            int hashCode = attrVal.hashCode();
+                            joinHashCode ^= hashCode;
+                        }
+
+                        boolean isExisting = hashIndex.containsKey(joinHashCode);
+                        if(isExisting) { // There is possibility that there exists join pair record
+                            List<Record> bucket = hashIndex.get(joinHashCode);
+
+                            // TODO make join pair or concatenation
+                        }
+                        System.out.println();
+                    }
+                }
 
                 buildInputBuffPages.clear();
-                input.close();
             }
 
 
