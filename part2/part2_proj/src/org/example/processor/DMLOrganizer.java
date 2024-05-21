@@ -7,6 +7,7 @@ import org.example.record.Block;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.RandomAccessFile;
@@ -16,6 +17,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
+import static org.example.record.NullConst.NULL_LINK;
 import static org.example.record.NullConst.isNullAttribute;
 
 public class DMLOrganizer {
@@ -101,6 +103,10 @@ public class DMLOrganizer {
         BufferPage[] partitioningBuffPages = new BufferPage[PARTITION_CNT];
         BufferPage inputBuffPage = new BufferPage();
 
+        for(int i = 0; i < partitioningBuffPages.length; i++) {
+            partitioningBuffPages[i] = new BufferPage();
+        }
+
         //Read from the file
         try {
             RelationMetadata relationMetadataR = relationMetadataArr[0];
@@ -116,6 +122,14 @@ public class DMLOrganizer {
             // Partitioning relation R
             int recordSize = getRecordSize(attrMetadataListR);
             RandomAccessFile input = new RandomAccessFile(relationMetadataR.getLocation() + relationMetadataR.getRelationName() + ".tbl", "r");
+
+            // Creating temporary files for Partitioning
+            File[] temporaryFileR = new File[PARTITION_CNT];
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                temporaryFileR[i] = new File("temporary_file/r" + i + ".tmptbl");
+                // TODO create temporary file
+            }
+
             int blockIdx = 0;
             while(true) {
                 int blockSize = recordSize * BlockingFactor.VAL;
@@ -149,16 +163,21 @@ public class DMLOrganizer {
                 for(int i = 0; i < inputBuffPage.getRecordCnt(); i++) {
                     int joinHashCode = 0;
                     Record record = records[i];
+                    record.setLink(NULL_LINK); // This record will be saved into the partition file of which data structure is basic fixed-length file structure.
+                                               // So just the link is useless and make link null.
                     List<char[]> attrList = record.getAttributes();
                     for (String attr : joinAttr) { // Get the XORs of join column of record for partitioning
                         int jointAttrPos = joinAttrPosR.get(attr);
-                        String attrVal = Arrays.toString(attrList.get(jointAttrPos)).trim();
+                        String attrVal = new String(attrList.get(jointAttrPos)).trim();
                         int hashCode = attrVal.hashCode();
                         joinHashCode ^= hashCode;
                     }
                     int partitionNum = Math.floorMod(joinHashCode, PARTITION_CNT);
-
-                    System.out.println(Arrays.toString(attrList.get(0)).trim() + " " +partitionNum);
+                    partitioningBuffPages[partitionNum].addRecord(record);
+                    if(partitioningBuffPages[partitionNum].isFull()) {
+                        // TODO Write to the disk
+                    }
+//                    System.out.println(new String(attrList.get(0)).trim() + " " +partitionNum);
                 }
 
                 // TODO Make temporary files for R
