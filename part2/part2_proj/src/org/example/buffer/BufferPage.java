@@ -1,8 +1,14 @@
 package org.example.buffer;
 
+import org.example.metadata.AttributeMetadata;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
+import org.example.util.ByteUtil;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.example.record.NullConst.isNullAttribute;
 import static org.example.util.ByteUtil.intToByteArray;
 
 public class BufferPage {
@@ -13,6 +19,33 @@ public class BufferPage {
         recordCnt = 0;
         this.records = new Record[BlockingFactor.VAL];
     }
+
+    public BufferPage(byte[] blockBytes, List<AttributeMetadata> attributeMetadataList) {
+        this.records = new Record[BlockingFactor.VAL];
+
+        int bytesIdx = 0;
+        for(int i = 0; i < BlockingFactor.VAL; i++) {
+            List<char[]> attributes = new ArrayList<>();
+            for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+                int attributeLength = attributeMetadata.getLength();
+                char[] attribute = new char[attributeLength];
+                for (int j = 0; j < attributeLength; j++) {
+                    attribute[j] = (char) blockBytes[bytesIdx++];
+                }
+                attributes.add(attribute);
+            }
+
+            // Exclude null record
+            boolean isValidRecord = attributes.stream().anyMatch(attr -> !isNullAttribute(attr));
+            if(!isValidRecord) {
+                continue;
+            }
+
+            records[i] = new Record(attributes, null);
+            recordCnt++;
+        }
+    }
+
 
     public Record[] getRecords() {
         return records;

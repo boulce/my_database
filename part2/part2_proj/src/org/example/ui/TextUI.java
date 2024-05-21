@@ -195,10 +195,8 @@ public class TextUI {
                     }
 
 
-                    // TODO Partitioning
+                    // TODO
                     dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
-
-                    // TODO Join
 
                     // TODO Print
 

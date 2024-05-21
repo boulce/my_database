@@ -10,7 +10,7 @@ public class Record {
     List<char[]> attributes;
     Integer link;
 
-    public Record(List<char[]> attributes, int link) {
+    public Record(List<char[]> attributes, Integer link) {
         this.attributes = attributes;
         this.link = link;
     }

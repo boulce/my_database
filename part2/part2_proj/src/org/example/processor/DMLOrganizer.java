@@ -97,6 +97,10 @@ public class DMLOrganizer {
 
     public void testJoin(RelationMetadata[] relationMetadataArr, List<AttributeMetadata>[] attributeMetadataListArr, List<String> joinAttr, HashMap<String, Integer>[] joinAttrPosArr) {
         final int PARTITION_CNT = 3;
+
+        File[] temporaryFilesR;
+        File[] temporaryFilesS;
+        ///////////////////////////////////////////////////////////////////// START OF PARTITIONING
         BufferPage[] partitioningBuffPages = new BufferPage[PARTITION_CNT];
         BufferPage inputBuffPage = new BufferPage();
 
@@ -123,15 +127,15 @@ public class DMLOrganizer {
             RandomAccessFile input = new RandomAccessFile(relationMetadataR.getLocation() + relationMetadataR.getRelationName() + ".tbl", "r");
 
             // Creating temporary files for Partitioning
-            File[] temporaryFileR = new File[PARTITION_CNT];
+            temporaryFilesR = new File[PARTITION_CNT];
             FileOutputStream[] partitionInput = new FileOutputStream[PARTITION_CNT];
             for(int i = 0; i < PARTITION_CNT; i++) {
-                temporaryFileR[i] = new File("temporary_file/r" + i + ".tmptbl");
-                if(temporaryFileR[i].exists()) {
-                    temporaryFileR[i].delete();
+                temporaryFilesR[i] = new File("temporary_file/r" + i + ".tmptbl");
+                if(temporaryFilesR[i].exists()) {
+                    temporaryFilesR[i].delete();
                 }
-                temporaryFileR[i].createNewFile();
-                partitionInput[i] = new FileOutputStream(temporaryFileR[i], true);
+                temporaryFilesR[i].createNewFile();
+                partitionInput[i] = new FileOutputStream(temporaryFilesR[i], true);
             }
 
             int blockIdx = 0;
@@ -183,14 +187,12 @@ public class DMLOrganizer {
                         partitionInput[partitionNum].write(buffByte);
                         partitioningBuffPages[partitionNum].clear();
                     }
-                    System.out.println(new String(attrList.get(0)).trim() + " " + partitionNum);
                 }
                 inputBuffPage.clear();
             }
 
             for(int i = 0; i < partitioningBuffPages.length; i++) { // If partitionBuffer is not empty, write to the disk
                 if(partitioningBuffPages[i].getRecordCnt() > 0) {
-                    System.out.println(i);
                     byte[] buffByte = partitioningBuffPages[i].getByteArray();
                     partitionInput[i].write(buffByte);
                     partitioningBuffPages[i].clear();
@@ -207,15 +209,15 @@ public class DMLOrganizer {
             input = new RandomAccessFile(relationMetadataS.getLocation() + relationMetadataS.getRelationName() + ".tbl", "r");
 
             // Creating temporary files for Partitioning
-            File[] temporaryFileS = new File[PARTITION_CNT];
+            temporaryFilesS = new File[PARTITION_CNT];
             partitionInput = new FileOutputStream[PARTITION_CNT];
             for(int i = 0; i < PARTITION_CNT; i++) {
-                temporaryFileS[i] = new File("temporary_file/s" + i + ".tmptbl");
-                if(temporaryFileS[i].exists()) {
-                    temporaryFileS[i].delete();
+                temporaryFilesS[i] = new File("temporary_file/s" + i + ".tmptbl");
+                if(temporaryFilesS[i].exists()) {
+                    temporaryFilesS[i].delete();
                 }
-                temporaryFileS[i].createNewFile();
-                partitionInput[i] = new FileOutputStream(temporaryFileS[i], true);
+                temporaryFilesS[i].createNewFile();
+                partitionInput[i] = new FileOutputStream(temporaryFilesS[i], true);
             }
 
             blockIdx = 0;
@@ -267,7 +269,6 @@ public class DMLOrganizer {
                         partitionInput[partitionNum].write(buffByte);
                         partitioningBuffPages[partitionNum].clear();
                     }
-                    System.out.println(new String(attrList.get(0)).trim() + " " + partitionNum);
                 }
                 inputBuffPage.clear();
             }
@@ -284,6 +285,75 @@ public class DMLOrganizer {
                 partitionInput[i].close();
             }
             input.close();
+
+            ///////////////////////////////////////////////////////////////////// END OF PARTITIONING
+
+            ///////////////////////////////////////////////////////////////////// START OF JOIN
+            List<Record> resultSet = new ArrayList<>();
+            List<BufferPage> buildInputBuffPages = new ArrayList<>();
+            BufferPage probeInputBuffPages = new BufferPage();
+
+            RelationMetadata relationMetadataBuild = relationMetadataS;
+            RelationMetadata relationMetadataProbe = relationMetadataR;
+            List<AttributeMetadata> attrMetadataListBuild = attrMetadataListS;
+            List<AttributeMetadata> attrMetadataListProbe = attrMetadataListR;
+            List<Integer> attPosOfPrimaryKeyBuild = attPosOfPrimaryKeyS;
+            List<Integer> attPosOfPrimaryKeyProbe = attPosOfPrimaryKeyR;
+            HashMap<String, Integer> joinAttrPosBuild = joinAttrPosS;
+            HashMap<String, Integer> joinAttrPosProbe = joinAttrPosR;
+
+            File[] temporaryFilesBuild = temporaryFilesS;
+            File[] temporaryFilesProbe = temporaryFilesR;
+
+            recordSize = getRecordSizeExceptLink(attrMetadataListBuild);
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                // Read BuildInput Partition to the Buffer
+                input = new RandomAccessFile(temporaryFilesBuild[i], "r");
+
+                while(true) {
+                    int blockSize = recordSize * BlockingFactor.VAL;
+
+                    byte[] readBlockBytes = new byte[blockSize];
+                    int readCnt = input.read(readBlockBytes);
+                    BufferPage readBlock = new BufferPage(readBlockBytes, attrMetadataListBuild);
+                    buildInputBuffPages.add(readBlock);
+
+                    if(readCnt == -1) { // EOF
+                        break;
+                    }
+                }
+
+                // Build hashIndex
+                HashMap<Integer, List<Record>> hashIndex = new HashMap<>();
+                for (BufferPage page : buildInputBuffPages) {
+                    Record[] records = page.getRecords();
+                    for (int j = 0; j < page.getRecordCnt(); j++) {
+                        Record record = records[j];
+                        int joinHashCode = 0;
+                        List<char[]> attrList = record.getAttributes();
+                        for (String attr : joinAttr) { // Get the XORs of join column of record for building hash index
+                            int jointAttrPos = joinAttrPosBuild.get(attr);
+                            String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                            int hashCode = attrVal.hashCode();
+                            joinHashCode ^= hashCode;
+                        }
+                        boolean isExisting = hashIndex.containsKey(joinHashCode);
+                        if(!isExisting) {
+                            hashIndex.put(joinHashCode, new ArrayList<>());
+                        }
+                        List<Record> bucket = hashIndex.get(joinHashCode);
+                        bucket.add(record);
+                    }
+                }
+
+                buildInputBuffPages.clear();
+                input.close();
+            }
+
+
+
+
+            ///////////////////////////////////////////////////////////////////// END OF JOIN
 
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
@@ -309,6 +379,14 @@ public class DMLOrganizer {
             recordSize += attributeMetadata.getLength();
         }
         recordSize += 4;
+        return recordSize;
+    }
+
+    static int getRecordSizeExceptLink(List<AttributeMetadata> attributeMetadataList) {
+        int recordSize = 0;
+        for (AttributeMetadata attributeMetadata : attributeMetadataList) {
+            recordSize += attributeMetadata.getLength();
+        }
         return recordSize;
     }
 
