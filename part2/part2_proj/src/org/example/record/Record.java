@@ -8,7 +8,7 @@ import java.util.List;
 
 public class Record {
     List<char[]> attributes;
-    int link;
+    Integer link;
 
     public Record(List<char[]> attributes, int link) {
         this.attributes = attributes;
@@ -47,7 +47,7 @@ public class Record {
         return link;
     }
 
-    public void setLink(int link) {
+    public void setLink(Integer link) {
         this.link = link;
     }
 
@@ -65,7 +65,9 @@ public class Record {
         for (char[] attribute : attributes) {
             len += attribute.length;
         }
-        len += 4;
+        if (link != null) {
+            len += 4;
+        }
 
         return len;
     }

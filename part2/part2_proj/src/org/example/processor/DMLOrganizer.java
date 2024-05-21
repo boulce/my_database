@@ -7,10 +7,7 @@ import org.example.record.Block;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
@@ -99,7 +96,7 @@ public class DMLOrganizer {
     }
 
     public void testJoin(RelationMetadata[] relationMetadataArr, List<AttributeMetadata>[] attributeMetadataListArr, List<String> joinAttr, HashMap<String, Integer>[] joinAttrPosArr) {
-        final int PARTITION_CNT = 5;
+        final int PARTITION_CNT = 3;
         BufferPage[] partitioningBuffPages = new BufferPage[PARTITION_CNT];
         BufferPage inputBuffPage = new BufferPage();
 
@@ -119,15 +116,22 @@ public class DMLOrganizer {
             HashMap<String, Integer> joinAttrPosS = joinAttrPosArr[1];
 
 
+            // TODO refactoring partitioning for R, S. There is duplicate code
+
             // Partitioning relation R
             int recordSize = getRecordSize(attrMetadataListR);
             RandomAccessFile input = new RandomAccessFile(relationMetadataR.getLocation() + relationMetadataR.getRelationName() + ".tbl", "r");
 
             // Creating temporary files for Partitioning
             File[] temporaryFileR = new File[PARTITION_CNT];
+            FileOutputStream[] partitionInput = new FileOutputStream[PARTITION_CNT];
             for(int i = 0; i < PARTITION_CNT; i++) {
                 temporaryFileR[i] = new File("temporary_file/r" + i + ".tmptbl");
-                // TODO create temporary file
+                if(temporaryFileR[i].exists()) {
+                    temporaryFileR[i].delete();
+                }
+                temporaryFileR[i].createNewFile();
+                partitionInput[i] = new FileOutputStream(temporaryFileR[i], true);
             }
 
             int blockIdx = 0;
@@ -163,8 +167,6 @@ public class DMLOrganizer {
                 for(int i = 0; i < inputBuffPage.getRecordCnt(); i++) {
                     int joinHashCode = 0;
                     Record record = records[i];
-                    record.setLink(NULL_LINK); // This record will be saved into the partition file of which data structure is basic fixed-length file structure.
-                                               // So just the link is useless and make link null.
                     List<char[]> attrList = record.getAttributes();
                     for (String attr : joinAttr) { // Get the XORs of join column of record for partitioning
                         int jointAttrPos = joinAttrPosR.get(attr);
@@ -172,26 +174,117 @@ public class DMLOrganizer {
                         int hashCode = attrVal.hashCode();
                         joinHashCode ^= hashCode;
                     }
+                    // Partitioning by hash function
                     int partitionNum = Math.floorMod(joinHashCode, PARTITION_CNT);
                     partitioningBuffPages[partitionNum].addRecord(record);
-                    if(partitioningBuffPages[partitionNum].isFull()) {
-                        // TODO Write to the disk
+
+                    if(partitioningBuffPages[partitionNum].isFull()) { // If partitionBuffer is full, write to the disk
+                        byte[] buffByte = partitioningBuffPages[partitionNum].getByteArray();
+                        partitionInput[partitionNum].write(buffByte);
+                        partitioningBuffPages[partitionNum].clear();
                     }
-//                    System.out.println(new String(attrList.get(0)).trim() + " " +partitionNum);
+                    System.out.println(new String(attrList.get(0)).trim() + " " + partitionNum);
                 }
-
-                // TODO Make temporary files for R
-
-                // TODO Partitioning by hash function
-
-                // TODO Output to the Disk When Full
-
                 inputBuffPage.clear();
             }
 
-            // TODO Partitioning S
+            for(int i = 0; i < partitioningBuffPages.length; i++) { // If partitionBuffer is not empty, write to the disk
+                if(partitioningBuffPages[i].getRecordCnt() > 0) {
+                    System.out.println(i);
+                    byte[] buffByte = partitioningBuffPages[i].getByteArray();
+                    partitionInput[i].write(buffByte);
+                    partitioningBuffPages[i].clear();
+                }
+            }
 
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                partitionInput[i].close();
+            }
             input.close();
+
+            // Partitioning relation S
+            recordSize = getRecordSize(attrMetadataListS);
+            input = new RandomAccessFile(relationMetadataS.getLocation() + relationMetadataS.getRelationName() + ".tbl", "r");
+
+            // Creating temporary files for Partitioning
+            File[] temporaryFileS = new File[PARTITION_CNT];
+            partitionInput = new FileOutputStream[PARTITION_CNT];
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                temporaryFileS[i] = new File("temporary_file/s" + i + ".tmptbl");
+                if(temporaryFileS[i].exists()) {
+                    temporaryFileS[i].delete();
+                }
+                temporaryFileS[i].createNewFile();
+                partitionInput[i] = new FileOutputStream(temporaryFileS[i], true);
+            }
+
+            blockIdx = 0;
+            while(true) {
+                int blockSize = recordSize * BlockingFactor.VAL;
+
+                byte[] readBlockBytes = new byte[blockSize];
+                int readCnt = input.read(readBlockBytes);
+                Block readBlock = new Block(blockIdx++, readBlockBytes, attrMetadataListS);
+
+                if(readCnt == -1) { // EOF
+                    break;
+                }
+
+                for(int i = 0; i < BlockingFactor.VAL; i++) {
+                    Record readRecord = readBlock.getRecords()[i];
+
+                    // If some attribute of primary-key of a record is NULL, it is a deleted record.
+                    // So don't contain the deleted record to the result set
+                    boolean isDeleted = false;
+                    for(int pos : attPosOfPrimaryKeyS) {
+                        if (isNullAttribute(readRecord.getAttributes().get(pos))){
+                            isDeleted = true;
+                            break;
+                        }
+                    }
+                    if(!isDeleted) {
+                        inputBuffPage.addRecord(readRecord); // Add valid record to the input buffer page
+                    }
+                }
+
+                Record[] records = inputBuffPage.getRecords();
+                for(int i = 0; i < inputBuffPage.getRecordCnt(); i++) {
+                    int joinHashCode = 0;
+                    Record record = records[i];
+                    List<char[]> attrList = record.getAttributes();
+                    for (String attr : joinAttr) { // Get the XORs of join column of record for partitioning
+                        int jointAttrPos = joinAttrPosS.get(attr);
+                        String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                        int hashCode = attrVal.hashCode();
+                        joinHashCode ^= hashCode;
+                    }
+                    // Partitioning by hash function
+                    int partitionNum = Math.floorMod(joinHashCode, PARTITION_CNT);
+                    partitioningBuffPages[partitionNum].addRecord(record);
+
+                    if(partitioningBuffPages[partitionNum].isFull()) { // If partitionBuffer is full, write to the disk
+                        byte[] buffByte = partitioningBuffPages[partitionNum].getByteArray();
+                        partitionInput[partitionNum].write(buffByte);
+                        partitioningBuffPages[partitionNum].clear();
+                    }
+                    System.out.println(new String(attrList.get(0)).trim() + " " + partitionNum);
+                }
+                inputBuffPage.clear();
+            }
+
+            for(int i = 0; i < partitioningBuffPages.length; i++) { // If partitionBuffer is not empty, write to the disk
+                if(partitioningBuffPages[i].getRecordCnt() > 0) {
+                    byte[] buffByte = partitioningBuffPages[i].getByteArray();
+                    partitionInput[i].write(buffByte);
+                    partitioningBuffPages[i].clear();
+                }
+            }
+
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                partitionInput[i].close();
+            }
+            input.close();
+
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
         } catch (IOException e) {
