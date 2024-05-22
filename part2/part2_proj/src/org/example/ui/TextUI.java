@@ -7,6 +7,7 @@ import org.example.processor.DDLInterpreter;
 import org.example.processor.DMLOrganizer;
 import org.example.record.Block;
 import org.example.record.BlockingFactor;
+import org.example.record.JoinedRecords;
 import org.example.record.Record;
 
 import java.io.FileNotFoundException;
@@ -120,6 +121,8 @@ public class TextUI {
 
                 } else if (Objects.equals(command, "6")) {
 
+                    // TODO REFACTORING EXTRACT METHOD
+
                     RelationMetadata[] relationMetadataArr = new RelationMetadata[2];
                     ArrayList<AttributeMetadata>[] attributeMetadataListArr = new ArrayList[relationMetadataArr.length];
 
@@ -195,10 +198,11 @@ public class TextUI {
                     }
 
 
-                    // TODO
-                    dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
+                    // TODO REFACTORING inside testJoin and change name of testJoin, after all refactoring, delete unused import
+                    JoinedRecords joinedRecords = dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
 
-                    // TODO Print
+                    // Print the join result
+                    printResultSet(joinedRecords.getAttrMetadataList(), joinedRecords.getResultSet());
 
 
                 } else if (Objects.equals(command, "0")) {
@@ -458,7 +462,7 @@ public class TextUI {
         return primaryKeyMap;
     }
 
-    private void printResultSet(ArrayList<AttributeMetadata> attributeMetadataList, List<Record> resultSet) {
+    private void printResultSet(List<AttributeMetadata> attributeMetadataList, List<Record> resultSet) {
         // Draw upper border
         System.out.print("┌");
         for(int s = 0; s < attributeMetadataList.size()-1; s++) {

@@ -3,9 +3,7 @@ package org.example.processor;
 import org.example.buffer.BufferPage;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
-import org.example.record.Block;
-import org.example.record.BlockingFactor;
-import org.example.record.Record;
+import org.example.record.*;
 
 import java.io.*;
 import java.sql.Connection;
@@ -14,7 +12,6 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-import static org.example.record.NullConst.NULL_LINK;
 import static org.example.record.NullConst.isNullAttribute;
 
 public class DMLOrganizer {
@@ -72,7 +69,7 @@ public class DMLOrganizer {
         List<Record> resultSet = queryEvaluationEngine.getRecordsForSelectAll(relationMetadata, attributeMetadataList, recordSize, attPosOfPrimaryKey);
 
         // sort result set by primary key as ascending order
-        sortResultSetByAttributes(attPosOfPrimaryKey, resultSet);
+        sortResultSetByPrimaryAttributes(attPosOfPrimaryKey, resultSet);
         return resultSet;
     }
 
@@ -95,11 +92,14 @@ public class DMLOrganizer {
         return attPosOfPrimaryKey;
     }
 
-    public void testJoin(RelationMetadata[] relationMetadataArr, List<AttributeMetadata>[] attributeMetadataListArr, List<String> joinAttr, HashMap<String, Integer>[] joinAttrPosArr) {
+    public JoinedRecords testJoin(RelationMetadata[] relationMetadataArr, List<AttributeMetadata>[] attributeMetadataListArr, List<String> joinAttrs, HashMap<String, Integer>[] joinAttrPosArr) {
+        // TODO refactoring, extracting method and moving to QueryEvaluationEngine
+
         final int PARTITION_CNT = 3;
 
         File[] temporaryFilesR;
         File[] temporaryFilesS;
+
         ///////////////////////////////////////////////////////////////////// START OF PARTITIONING
         BufferPage[] partitioningBuffPages = new BufferPage[PARTITION_CNT];
         BufferPage inputBuffPage = new BufferPage();
@@ -108,7 +108,7 @@ public class DMLOrganizer {
             partitioningBuffPages[i] = new BufferPage();
         }
 
-        //Read from the file
+        // Read from the file
         try {
             RelationMetadata relationMetadataR = relationMetadataArr[0];
             RelationMetadata relationMetadataS = relationMetadataArr[1];
@@ -172,9 +172,9 @@ public class DMLOrganizer {
                     int joinHashCode = 0;
                     Record record = records[i];
                     List<char[]> attrList = record.getAttributes();
-                    for (String attr : joinAttr) { // Get the XORs of join column of record for partitioning
-                        int jointAttrPos = joinAttrPosR.get(attr);
-                        String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                    for (String attr : joinAttrs) { // Get the XORs of join column of record for partitioning
+                        int joinAttrPos = joinAttrPosR.get(attr);
+                        String attrVal = new String(attrList.get(joinAttrPos)).trim();
                         int hashCode = attrVal.hashCode();
                         joinHashCode ^= hashCode;
                     }
@@ -254,9 +254,9 @@ public class DMLOrganizer {
                     int joinHashCode = 0;
                     Record record = records[i];
                     List<char[]> attrList = record.getAttributes();
-                    for (String attr : joinAttr) { // Get the XORs of join column of record for partitioning
-                        int jointAttrPos = joinAttrPosS.get(attr);
-                        String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                    for (String attr : joinAttrs) { // Get the XORs of join column of record for partitioning
+                        int joinAttrPos = joinAttrPosS.get(attr);
+                        String attrVal = new String(attrList.get(joinAttrPos)).trim();
                         int hashCode = attrVal.hashCode();
                         joinHashCode ^= hashCode;
                     }
@@ -289,35 +289,32 @@ public class DMLOrganizer {
             ///////////////////////////////////////////////////////////////////// END OF PARTITIONING
 
             ///////////////////////////////////////////////////////////////////// START OF JOIN
-            List<Record> resultSet = new ArrayList<>();
             List<BufferPage> buildInputBuffPages = new ArrayList<>();
             BufferPage probeInputBuffPage;
 
-            RelationMetadata relationMetadataBuild = relationMetadataS;
-            RelationMetadata relationMetadataProbe = relationMetadataR;
             List<AttributeMetadata> attrMetadataListBuild = attrMetadataListS;
             List<AttributeMetadata> attrMetadataListProbe = attrMetadataListR;
-            List<Integer> attPosOfPrimaryKeyBuild = attPosOfPrimaryKeyS;
-            List<Integer> attPosOfPrimaryKeyProbe = attPosOfPrimaryKeyR;
             HashMap<String, Integer> joinAttrPosBuild = joinAttrPosS;
             HashMap<String, Integer> joinAttrPosProbe = joinAttrPosR;
 
             File[] temporaryFilesBuild = temporaryFilesS;
             File[] temporaryFilesProbe = temporaryFilesR;
 
+            List<MatchedRecord> matchedRecords = new ArrayList<>();
+
             int recordSizeBuild = getRecordSizeExceptLink(attrMetadataListBuild);
             for(int i = 0; i < PARTITION_CNT; i++) {
                 // Read BuildInput Partition to the Buffer
                 input = new RandomAccessFile(temporaryFilesBuild[i], "r");
 
-                while(true) {
+                while (true) {
                     int blockSize = recordSizeBuild * BlockingFactor.VAL;
 
                     byte[] readBlockBytes = new byte[blockSize];
                     int readCnt = input.read(readBlockBytes);
                     BufferPage readBlock = new BufferPage(readBlockBytes, attrMetadataListBuild);
 
-                    if(readCnt == -1) { // EOF
+                    if (readCnt == -1) { // EOF
                         break;
                     }
 
@@ -325,74 +322,130 @@ public class DMLOrganizer {
                 }
 
                 // Build hashIndex
-                HashMap<Integer, List<Record>> hashIndex = new HashMap<>();
+                int bucketCnt = 5;
+                List<Record>[] hashIndex = new ArrayList[bucketCnt];
+
+                for (int key = 0; key < bucketCnt; key++) {
+                    hashIndex[key] = new ArrayList<>();
+                }
+
                 for (BufferPage page : buildInputBuffPages) {
                     Record[] records = page.getRecords();
                     for (int j = 0; j < page.getRecordCnt(); j++) {
                         Record record = records[j];
                         int joinHashCode = 0;
                         List<char[]> attrList = record.getAttributes();
-                        for (String attr : joinAttr) { // Get the XORs of join column of record for building hash index
-                            int jointAttrPos = joinAttrPosBuild.get(attr);
-                            String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                        for (String attr : joinAttrs) { // Get the XORs of join column of record for building hash index
+                            int joinAttrPos = joinAttrPosBuild.get(attr);
+                            String attrVal = new String(attrList.get(joinAttrPos)).trim();
                             int hashCode = attrVal.hashCode();
                             joinHashCode ^= hashCode;
                         }
-                        boolean isExisting = hashIndex.containsKey(joinHashCode);
-                        if(!isExisting) {
-                            hashIndex.put(joinHashCode, new ArrayList<>());
-                        }
-                        List<Record> bucket = hashIndex.get(joinHashCode);
+                        int bucketNum = Math.floorMod(joinHashCode, bucketCnt);
+                        List<Record> bucket = hashIndex[bucketNum];
                         bucket.add(record);
                     }
                 }
                 input.close();
 
-                // TODO Reading corresponding Probe input Partition
+                // Reading corresponding Probe input Partition
                 input = new RandomAccessFile(temporaryFilesProbe[i], "r");
                 int recordSizeProbe = getRecordSizeExceptLink(attrMetadataListProbe);
 
-                while(true) {
+                while (true) {
                     int blockSize = recordSizeProbe * BlockingFactor.VAL;
 
                     byte[] readBlockBytes = new byte[blockSize];
                     int readCnt = input.read(readBlockBytes);
                     probeInputBuffPage = new BufferPage(readBlockBytes, attrMetadataListProbe);
 
-                    if(readCnt == -1) { // EOF
+                    if (readCnt == -1) { // EOF
                         break;
                     }
 
-                    // TODO Probe by using join attributes of probe input
+                    // Probe by using join attributes of probe input
                     Record[] records = probeInputBuffPage.getRecords();
-                    for(int j = 0; j < probeInputBuffPage.getRecordCnt(); j++) {
+//                    System.out.println(i); // TODO test
+                    for (int j = 0; j < probeInputBuffPage.getRecordCnt(); j++) {
                         Record record = records[j];
                         int joinHashCode = 0;
-                        List<char[]> attrList = record.getAttributes();
-                        for (String attr : joinAttr) { // Get the XORs of join column of record for building hash index
-                            int jointAttrPos = joinAttrPosProbe.get(attr);
-                            String attrVal = new String(attrList.get(jointAttrPos)).trim();
+                        List<char[]> attrListProbe = record.getAttributes();
+                        for (String attr : joinAttrs) { // Get the XORs of join column of record for building hash index
+                            int joinAttrPos = joinAttrPosProbe.get(attr);
+                            String attrVal = new String(attrListProbe.get(joinAttrPos)).trim();
                             int hashCode = attrVal.hashCode();
                             joinHashCode ^= hashCode;
                         }
 
-                        boolean isExisting = hashIndex.containsKey(joinHashCode);
-                        if(isExisting) { // There is possibility that there exists join pair record
-                            List<Record> bucket = hashIndex.get(joinHashCode);
+                        int bucketNum = Math.floorMod(joinHashCode, bucketCnt);
+                        List<Record> bucket = hashIndex[bucketNum];
 
-                            // TODO make join pair or concatenation
+                        // Matching record of build input partition and record of probe input partition
+                        for (Record matchedRecord : bucket) {
+                            // Check the join columns are really same between records of probe and build input before concatenating
+                            boolean matched = true;
+                            List<char[]> attrListBuild = matchedRecord.getAttributes();
+                            for (String attr : joinAttrs) {
+                                int attrPosBuild = joinAttrPosBuild.get(attr);
+                                int attrPosProbe = joinAttrPosProbe.get(attr);
+
+                                String attrValBuild = new String(attrListBuild.get(attrPosBuild)).trim();
+                                String attrValProbe = new String(attrListProbe.get(attrPosProbe)).trim();
+
+                                if (!attrValBuild.equals(attrValProbe)) { // Join columns are not same
+                                    matched = false;
+                                    break;
+                                }
+                            }
+
+
+                            if (matched) { // If two records are matched, concatenate two records
+//                                for (char[] attribute : attrListProbe) { // TODO PRINT TEST
+//                                    System.out.print(new String(attribute).trim() + " ");
+//                                }
+//                                for (char[] attribute : attrListBuild) {  // TODO PRINT TEST
+//                                    System.out.print(new String(attribute).trim() + " ");
+//                                }
+//                                System.out.println();
+
+                                matchedRecords.add(new MatchedRecord(record, matchedRecord));
+
+                            }
                         }
-                        System.out.println();
+//                        List<char[]> attributes = record.getAttributes(); // TODO PRINT TEST
+//                        System.out.print("probe: ");
+//                        for (char[] attribute : attributes) {
+//                            System.out.print(new String(attribute).trim() + " ");
+//                        }
+//                        System.out.println();
+//
+//                        for (Record rec : bucket) { // TODO PRINT TEST
+//                            List<char[]> att = rec.getAttributes();
+//                            System.out.print("build: ");
+//                            for (char[] attribute : att) {
+//                                System.out.print(new String(attribute).trim() + " ");
+//                            }
+//                            System.out.println();
+//                        }
+//                        System.out.println();
                     }
                 }
-
+                input.close();
                 buildInputBuffPages.clear();
             }
+            JoinedRecords joinedRecords = new JoinedRecords(attrMetadataListProbe, attrMetadataListBuild, joinAttrs, joinAttrPosBuild, matchedRecords);
+            sortResultSetByAttributes(joinedRecords.getResultSet());
 
-
-
-
+            // Delete temporary files
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                if(temporaryFilesR[i].exists()) {
+                    temporaryFilesR[i].delete();
+                    temporaryFilesS[i].delete();
+                }
+            }
             ///////////////////////////////////////////////////////////////////// END OF JOIN
+
+            return  joinedRecords;
 
         } catch (FileNotFoundException e) {
             throw new RuntimeException(e);
@@ -429,7 +482,7 @@ public class DMLOrganizer {
         return recordSize;
     }
 
-    private static void sortResultSetByAttributes(List<Integer> attPosOfPrimaryKey, List<Record> resultSet) {
+    private static void sortResultSetByPrimaryAttributes(List<Integer> attPosOfPrimaryKey, List<Record> resultSet) {
         resultSet.sort(new Comparator<Record>() {
             @Override
             public int compare(Record a, Record b) {
@@ -444,7 +497,29 @@ public class DMLOrganizer {
                     }
                 }
 
-                return 0; // It won't occur, because the same there won't be same primary key records
+                return 0; // It won't occur, because there won't be same primary key records
+            }
+        });
+    }
+
+    private static void sortResultSetByAttributes(List<Record> resultSet) {
+        resultSet.sort(new Comparator<Record>() {
+            @Override
+            public int compare(Record a, Record b) {
+                int attrCnt = a.getAttributes().size();
+
+                for (int i = 0; i < attrCnt; i++) {
+                    String valA = new String(a.getAttributes().get(i));
+                    String valB = new String(b.getAttributes().get(i));
+
+                    if(valA.compareTo(valB) < 0) {
+                        return -1;
+                    } else if (valA.compareTo(valB) > 0) {
+                        return 1;
+                    }
+                }
+
+                return 0;
             }
         });
     }

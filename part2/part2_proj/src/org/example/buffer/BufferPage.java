@@ -16,12 +16,13 @@ public class BufferPage {
     int recordCnt;
 
     public BufferPage() {
-        recordCnt = 0;
         this.records = new Record[BlockingFactor.VAL];
+        this.recordCnt = 0;
     }
 
     public BufferPage(byte[] blockBytes, List<AttributeMetadata> attributeMetadataList) {
         this.records = new Record[BlockingFactor.VAL];
+        this.recordCnt = 0;
 
         int bytesIdx = 0;
         for(int i = 0; i < BlockingFactor.VAL; i++) {
