@@ -126,7 +126,6 @@ public class TextUI {
 
                     List<String> joinAttr = getJoinAttr(joinAttrPosArr);
 
-                    // TODO REFACTORING inside testJoin and change name of testJoin, after all refactoring, delete unused import
                     JoinedRecords joinedRecords = dmlOrganizer.getResultsForJoinRelations(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
 
                     // Print the join result
