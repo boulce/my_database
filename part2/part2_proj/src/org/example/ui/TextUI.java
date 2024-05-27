@@ -120,83 +120,15 @@ public class TextUI {
                     printResultSet(attributeMetadataList, resultSetForSelectOne);
 
                 } else if (Objects.equals(command, "6")) {
+                    // Get relation metadata to join
+                    RelationMetadata[] relationMetadataArr = getRelationMetadataToJoin(scanner, conn, dmlOrganizer);
 
-                    // TODO REFACTORING EXTRACT METHOD
+                    // Get attribute metadata to join
+                    ArrayList<AttributeMetadata>[] attributeMetadataListArr = getAttributeMetadataToJoin(relationMetadataArr, dmlOrganizer, conn);
 
-                    RelationMetadata[] relationMetadataArr = new RelationMetadata[2];
-                    ArrayList<AttributeMetadata>[] attributeMetadataListArr = new ArrayList[relationMetadataArr.length];
+                    HashMap<String, Integer>[] joinAttrPosArr = getJoinArrtPosArr(relationMetadataArr, scanner, attributeMetadataListArr);
 
-                    // Get relations to join
-                    for(int i = 0; i < relationMetadataArr.length; i++) {
-                        relationMetadataArr[i] = getValidRelationMetadata(scanner, conn, dmlOrganizer); // Get relation metadata
-                        attributeMetadataListArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
-                    }
-
-                    List<String> joinAttr = new ArrayList<>();
-                    HashMap<String, Integer>[] joinAttrPosArr = new HashMap[relationMetadataArr.length];
-                    for(int i = 0; i < joinAttrPosArr.length; i++) {
-                        joinAttrPosArr[i] = new HashMap<>();
-                    }
-
-                    int joinAttCnt;
-                    System.out.printf("Enter the number of join column: ");
-                    joinAttCnt = scanner.nextInt();
-                    scanner.nextLine();
-                    System.out.println();
-
-                    for(int i = 0; i < joinAttCnt; i++) {
-                        String jointAttrName;
-                        while(true) {
-                            System.out.printf("Enter the name of join column[" + i + "]: ");
-                            jointAttrName = scanner.nextLine();
-                            System.out.println();
-
-                            // Preventing duplicate join column
-                            String finalJointAttName = jointAttrName;
-                            boolean isExisting = joinAttr.stream()
-                                    .anyMatch(att -> att.equals(finalJointAttName));
-
-                            if(isExisting) {
-                                System.out.println("[ERROR] You input duplicate join column. Please try again.");
-                                System.out.println();
-                                continue;
-                            } else {
-                                // Check the join column is existing at both two relation
-                                boolean bothExisting = true;
-                                int[] joinAttrPos = new int[relationMetadataArr.length];
-
-                                for(int j = 0; j < relationMetadataArr.length; j++) {
-                                    boolean found = false;
-                                    List<AttributeMetadata> attributeMetadata = attributeMetadataListArr[j];
-                                    for(int k = 0; k < attributeMetadata.size(); k++) {
-                                        String attName = attributeMetadata.get(k).getAttributeName();
-                                        if(jointAttrName.equals(attName)) {
-                                            found = true;
-                                            joinAttrPos[j] = k;
-                                            break;
-                                        }
-                                    }
-
-                                    if(!found){
-                                        System.out.println("[ERROR] The join column '" + jointAttrName + "' doesn't exist on the relation '" + relationMetadataArr[j].getRelationName()+ "'. Please try again");
-                                        System.out.println();
-                                        bothExisting = false;
-                                        break;
-                                    }
-                                }
-
-                                if(bothExisting) {
-                                    // Add to valid join column information to joinAttr, joinAttrPosArr
-                                    joinAttr.add(jointAttrName);
-                                    for(int j = 0; j < relationMetadataArr.length; j++) {
-                                        joinAttrPosArr[j].put(jointAttrName, joinAttrPos[j]);
-                                    }
-                                    break;
-                                }
-                            }
-                        }
-                    }
-
+                    List<String> joinAttr = getJoinAttr(joinAttrPosArr);
 
                     // TODO REFACTORING inside testJoin and change name of testJoin, after all refactoring, delete unused import
                     JoinedRecords joinedRecords = dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
@@ -572,6 +504,95 @@ public class TextUI {
 
         Record recordToInsert = new Record(tuple, 0);
         return recordToInsert;
+    }
+
+    private static RelationMetadata[] getRelationMetadataToJoin(Scanner scanner, Connection conn, DMLOrganizer dmlOrganizer) throws SQLException {
+        RelationMetadata[] relationMetadataArr = new RelationMetadata[2];
+
+        for(int i = 0; i < relationMetadataArr.length; i++) {
+            relationMetadataArr[i] = getValidRelationMetadata(scanner, conn, dmlOrganizer); // Get relation metadata
+        }
+        return relationMetadataArr;
+    }
+
+    private static ArrayList<AttributeMetadata>[] getAttributeMetadataToJoin(RelationMetadata[] relationMetadataArr, DMLOrganizer dmlOrganizer, Connection conn) throws SQLException {
+        ArrayList<AttributeMetadata>[] attributeMetadataListArr = new ArrayList[relationMetadataArr.length];
+        for(int i = 0; i < relationMetadataArr.length; i++) {
+            attributeMetadataListArr[i] = dmlOrganizer.getAttributeMetadataForQuery(conn, relationMetadataArr[i]); // Get attribute metadata list
+        }
+        return attributeMetadataListArr;
+    }
+
+    private static HashMap<String, Integer>[] getJoinArrtPosArr(RelationMetadata[] relationMetadataArr, Scanner scanner, ArrayList<AttributeMetadata>[] attributeMetadataListArr) {
+        HashMap<String, Integer>[] joinAttrPosArr = new HashMap[relationMetadataArr.length];
+        for(int i = 0; i < joinAttrPosArr.length; i++) {
+            joinAttrPosArr[i] = new HashMap<>();
+        }
+
+        List<String> joinAttr = new ArrayList<>();
+        int joinAttCnt;
+        System.out.printf("Enter the number of join column: ");
+        joinAttCnt = scanner.nextInt();
+        scanner.nextLine();
+        System.out.println();
+
+        for(int i = 0; i < joinAttCnt; i++) {
+            String jointAttrName;
+            while(true) {
+                System.out.printf("Enter the name of join column[" + i + "]: ");
+                jointAttrName = scanner.nextLine();
+                System.out.println();
+
+                // Preventing duplicate join column
+                String finalJointAttName = jointAttrName;
+                boolean isExisting = joinAttr.stream()
+                        .anyMatch(att -> att.equals(finalJointAttName));
+
+                if(isExisting) {
+                    System.out.println("[ERROR] You input duplicate join column. Please try again.");
+                    System.out.println();
+                } else {
+                    // Check whether the join column is existing in both two relation
+                    boolean bothExisting = true;
+                    int[] joinAttrPos = new int[relationMetadataArr.length];
+
+                    for(int j = 0; j < relationMetadataArr.length; j++) {
+                        boolean found = false;
+                        List<AttributeMetadata> attributeMetadata = attributeMetadataListArr[j];
+                        for(int k = 0; k < attributeMetadata.size(); k++) {
+                            String attName = attributeMetadata.get(k).getAttributeName();
+                            if(jointAttrName.equals(attName)) {
+                                found = true;
+                                joinAttrPos[j] = k;
+                                break;
+                            }
+                        }
+
+                        if(!found){
+                            System.out.println("[ERROR] The join column '" + jointAttrName + "' doesn't exist on the relation '" + relationMetadataArr[j].getRelationName()+ "'. Please try again");
+                            System.out.println();
+                            bothExisting = false;
+                            break;
+                        }
+                    }
+
+                    if(bothExisting) {
+                        // Add to valid join column information to joinAttr, joinAttrPosArr
+                        joinAttr.add(jointAttrName);
+                        for(int j = 0; j < relationMetadataArr.length; j++) {
+                            joinAttrPosArr[j].put(jointAttrName, joinAttrPos[j]);
+                        }
+                        break;
+                    }
+                }
+            }
+        }
+        return joinAttrPosArr;
+    }
+
+    private static List<String> getJoinAttr(HashMap<String, Integer>[] joinAttrPosArr) {
+        List<String> joinAttr = new ArrayList<>(joinAttrPosArr[0].keySet());
+        return joinAttr;
     }
 
 }
