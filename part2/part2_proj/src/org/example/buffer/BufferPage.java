@@ -3,13 +3,11 @@ package org.example.buffer;
 import org.example.metadata.AttributeMetadata;
 import org.example.record.BlockingFactor;
 import org.example.record.Record;
-import org.example.util.ByteUtil;
 
 import java.util.ArrayList;
 import java.util.List;
 
 import static org.example.record.NullConst.isNullAttribute;
-import static org.example.util.ByteUtil.intToByteArray;
 
 public class BufferPage {
     Record[] records;

@@ -1,20 +1,18 @@
 package org.example.processor;
 
-import org.example.buffer.BufferPage;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
-import org.example.record.*;
+import org.example.record.JoinedRecords;
+import org.example.record.Record;
 
-import java.io.*;
+import java.io.IOException;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.*;
 
-import static org.example.buffer.JoinConst.BUCKET_CNT;
-import static org.example.buffer.JoinConst.PARTITION_CNT;
-import static org.example.record.NullConst.isNullAttribute;
+
 
 public class DMLOrganizer {
     public boolean isValidRelationMetatdata(Connection conn, String relationName, RelationMetadata relationMetadata) throws SQLException {
