@@ -1,20 +1,20 @@
 package org.example.processor;
 
+import org.example.buffer.BufferPage;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
-import org.example.record.Block;
-import org.example.record.BlockingFactor;
-import org.example.record.Record;
+import org.example.record.*;
 
-import java.io.IOException;
-import java.io.RandomAccessFile;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.example.processor.DMLOrganizer.getRecordSize;
+import static org.example.buffer.JoinConst.BUCKET_CNT;
+import static org.example.buffer.JoinConst.PARTITION_CNT;
+import static org.example.processor.DMLOrganizer.*;
 import static org.example.record.NullConst.NULL_LINK;
 import static org.example.record.NullConst.isNullAttribute;
 
@@ -278,5 +278,285 @@ public class QueryEvaluationEngine {
         }
 
         file.close();
+    }
+
+    JoinedRecords getJoinedRecords(RelationMetadata[] relationMetadataArr, List<AttributeMetadata>[] attributeMetadataListArr, List<String> joinAttrs, HashMap<String, Integer>[] joinAttrPosArr) {
+        // TODO refactoring, extracting method and moving to QueryEvaluationEngine
+
+        File[] temporaryFilesR;
+        File[] temporaryFilesS;
+
+        RelationMetadata relationMetadataR = relationMetadataArr[0];
+        RelationMetadata relationMetadataS = relationMetadataArr[1];
+        List<AttributeMetadata> attrMetadataListR = attributeMetadataListArr[0];
+        List<AttributeMetadata> attrMetadataListS = attributeMetadataListArr[1];
+        List<Integer> attPosOfPrimaryKeyR = getAttPosOfPrimaryKey(attrMetadataListR);
+        List<Integer> attPosOfPrimaryKeyS = getAttPosOfPrimaryKey(attrMetadataListS);
+        HashMap<String, Integer> joinAttrPosR = joinAttrPosArr[0];
+        HashMap<String, Integer> joinAttrPosS = joinAttrPosArr[1];
+
+        // Read from the file
+        try {
+            BufferPage[] partitioningBuffPages = new BufferPage[PARTITION_CNT];
+            BufferPage inputBuffPage = new BufferPage();
+
+            for(int i = 0; i < partitioningBuffPages.length; i++) {
+                partitioningBuffPages[i] = new BufferPage();
+            }
+            // Partitioning relation R
+            temporaryFilesR = partition(joinAttrs, attrMetadataListR, relationMetadataR, attPosOfPrimaryKeyR, inputBuffPage, joinAttrPosR, partitioningBuffPages, "r");
+            // Partitioning relation S
+            temporaryFilesS = partition(joinAttrs, attrMetadataListS, relationMetadataS, attPosOfPrimaryKeyS, inputBuffPage, joinAttrPosS, partitioningBuffPages, "s");
+
+            ///////////////////////////////////////////////////////////////////// START OF JOIN
+            RandomAccessFile input;
+            List<BufferPage> buildInputBuffPages = new ArrayList<>();
+            BufferPage probeInputBuffPage;
+
+            List<AttributeMetadata> attrMetadataListBuild = attrMetadataListS;
+            List<AttributeMetadata> attrMetadataListProbe = attrMetadataListR;
+            HashMap<String, Integer> joinAttrPosBuild = joinAttrPosS;
+            HashMap<String, Integer> joinAttrPosProbe = joinAttrPosR;
+
+            File[] temporaryFilesBuild = temporaryFilesS;
+            File[] temporaryFilesProbe = temporaryFilesR;
+
+            List<MatchedRecord> matchedRecords = new ArrayList<>();
+
+            int recordSizeBuild = getRecordSizeExceptLink(attrMetadataListBuild);
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                // Read BuildInput Partition to the Buffer
+                input = new RandomAccessFile(temporaryFilesBuild[i], "r");
+
+                while (true) {
+                    int blockSize = recordSizeBuild * BlockingFactor.VAL;
+
+                    byte[] readBlockBytes = new byte[blockSize];
+                    int readCnt = input.read(readBlockBytes);
+                    BufferPage readBlock = new BufferPage(readBlockBytes, attrMetadataListBuild);
+
+                    if (readCnt == -1) { // EOF
+                        break;
+                    }
+
+                    buildInputBuffPages.add(readBlock);
+                }
+
+                // Build hashIndex
+                List<Record>[] hashIndex = new ArrayList[BUCKET_CNT];
+
+                for (int key = 0; key < BUCKET_CNT; key++) {
+                    hashIndex[key] = new ArrayList<>();
+                }
+
+                for (BufferPage page : buildInputBuffPages) {
+                    Record[] records = page.getRecords();
+                    for (int j = 0; j < page.getRecordCnt(); j++) {
+                        Record record = records[j];
+                        int joinHashCode = 0;
+                        List<char[]> attrList = record.getAttributes();
+                        for (String attr : joinAttrs) { // Get the XORs of join column of record for building hash index
+                            int joinAttrPos = joinAttrPosBuild.get(attr);
+                            String attrVal = new String(attrList.get(joinAttrPos)).trim();
+                            int hashCode = attrVal.hashCode();
+                            joinHashCode ^= hashCode;
+                        }
+                        int bucketNum = Math.floorMod(joinHashCode, BUCKET_CNT);
+                        List<Record> bucket = hashIndex[bucketNum];
+                        bucket.add(record);
+                    }
+                }
+                input.close();
+
+                // Reading corresponding Probe input Partition
+                input = new RandomAccessFile(temporaryFilesProbe[i], "r");
+                int recordSizeProbe = getRecordSizeExceptLink(attrMetadataListProbe);
+
+                while (true) {
+                    int blockSize = recordSizeProbe * BlockingFactor.VAL;
+
+                    byte[] readBlockBytes = new byte[blockSize];
+                    int readCnt = input.read(readBlockBytes);
+                    probeInputBuffPage = new BufferPage(readBlockBytes, attrMetadataListProbe);
+
+                    if (readCnt == -1) { // EOF
+                        break;
+                    }
+
+                    // Probe by using join attributes of probe input
+                    Record[] records = probeInputBuffPage.getRecords();
+//                    System.out.println(i); // TODO test
+                    for (int j = 0; j < probeInputBuffPage.getRecordCnt(); j++) {
+                        Record record = records[j];
+                        int joinHashCode = 0;
+                        List<char[]> attrListProbe = record.getAttributes();
+                        for (String attr : joinAttrs) { // Get the XORs of join column of record for building hash index
+                            int joinAttrPos = joinAttrPosProbe.get(attr);
+                            String attrVal = new String(attrListProbe.get(joinAttrPos)).trim();
+                            int hashCode = attrVal.hashCode();
+                            joinHashCode ^= hashCode;
+                        }
+
+                        int bucketNum = Math.floorMod(joinHashCode, BUCKET_CNT);
+                        List<Record> bucket = hashIndex[bucketNum];
+
+                        // Matching record of build input partition and record of probe input partition
+                        for (Record matchedRecord : bucket) {
+                            // Check the join columns are really same between records of probe and build input before concatenating
+                            boolean matched = true;
+                            List<char[]> attrListBuild = matchedRecord.getAttributes();
+                            for (String attr : joinAttrs) {
+                                int attrPosBuild = joinAttrPosBuild.get(attr);
+                                int attrPosProbe = joinAttrPosProbe.get(attr);
+
+                                String attrValBuild = new String(attrListBuild.get(attrPosBuild)).trim();
+                                String attrValProbe = new String(attrListProbe.get(attrPosProbe)).trim();
+
+                                if (!attrValBuild.equals(attrValProbe)) { // Join columns are not same
+                                    matched = false;
+                                    break;
+                                }
+                            }
+
+
+                            if (matched) { // If two records are matched, concatenate two records
+//                                for (char[] attribute : attrListProbe) { // TODO PRINT TEST
+//                                    System.out.print(new String(attribute).trim() + " ");
+//                                }
+//                                for (char[] attribute : attrListBuild) {  // TODO PRINT TEST
+//                                    System.out.print(new String(attribute).trim() + " ");
+//                                }
+//                                System.out.println();
+
+                                matchedRecords.add(new MatchedRecord(record, matchedRecord));
+
+                            }
+                        }
+//                        List<char[]> attributes = record.getAttributes(); // TODO PRINT TEST
+//                        System.out.print("probe: ");
+//                        for (char[] attribute : attributes) {
+//                            System.out.print(new String(attribute).trim() + " ");
+//                        }
+//                        System.out.println();
+//
+//                        for (Record rec : bucket) { // TODO PRINT TEST
+//                            List<char[]> att = rec.getAttributes();
+//                            System.out.print("build: ");
+//                            for (char[] attribute : att) {
+//                                System.out.print(new String(attribute).trim() + " ");
+//                            }
+//                            System.out.println();
+//                        }
+//                        System.out.println();
+                    }
+                }
+                input.close();
+                buildInputBuffPages.clear();
+            }
+            JoinedRecords joinedRecords = new JoinedRecords(attrMetadataListProbe, attrMetadataListBuild, joinAttrs, joinAttrPosBuild, matchedRecords);
+
+            // Delete temporary files
+            for(int i = 0; i < PARTITION_CNT; i++) {
+                if(temporaryFilesR[i].exists()) {
+                    temporaryFilesR[i].delete();
+                    temporaryFilesS[i].delete();
+                }
+            }
+            ///////////////////////////////////////////////////////////////////// END OF JOIN
+
+            return joinedRecords;
+
+        } catch (FileNotFoundException e) {
+            throw new RuntimeException(e);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    private static File[] partition(List<String> joinAttrs, List<AttributeMetadata> attrMetadataListR, RelationMetadata relationMetadataR, List<Integer> attPosOfPrimaryKeyR, BufferPage inputBuffPage, HashMap<String, Integer> joinAttrPosR, BufferPage[] partitioningBuffPages, String tempFileName) throws IOException {
+        File[] temporaryFilesR;
+        int recordSize = getRecordSize(attrMetadataListR);
+        RandomAccessFile input = new RandomAccessFile(relationMetadataR.getLocation() + relationMetadataR.getRelationName() + ".tbl", "r");
+
+        // Creating temporary files for Partitioning
+        temporaryFilesR = new File[PARTITION_CNT];
+        FileOutputStream[] partitionOutput = new FileOutputStream[PARTITION_CNT];
+        for(int i = 0; i < PARTITION_CNT; i++) {
+            temporaryFilesR[i] = new File("temporary_file" + "/" + tempFileName + i + ".tmptbl");
+            if(temporaryFilesR[i].exists()) {
+                temporaryFilesR[i].delete();
+            }
+            temporaryFilesR[i].createNewFile();
+            partitionOutput[i] = new FileOutputStream(temporaryFilesR[i], true);
+        }
+
+        int blockIdx = 0;
+        while(true) {
+            int blockSize = recordSize * BlockingFactor.VAL;
+
+            // Read to input buffer page
+            byte[] readBlockBytes = new byte[blockSize];
+            int readCnt = input.read(readBlockBytes);
+            Block readBlock = new Block(blockIdx++, readBlockBytes, attrMetadataListR);
+
+            if(readCnt == -1) { // EOF
+                break;
+            }
+
+            for(int i = 0; i < BlockingFactor.VAL; i++) {
+                Record readRecord = readBlock.getRecords()[i];
+
+                // If some attribute of primary-key of a record is NULL, it is a deleted record.
+                // So don't contain the deleted record to the result set
+                boolean isDeleted = false;
+                for(int pos : attPosOfPrimaryKeyR) {
+                    if (isNullAttribute(readRecord.getAttributes().get(pos))){
+                        isDeleted = true;
+                        break;
+                    }
+                }
+                if(!isDeleted) {
+                    inputBuffPage.addRecord(readRecord); // Add valid record to the input buffer page
+                }
+            }
+
+            // Distribute the records of input buffer page to partitions by hash function
+            Record[] records = inputBuffPage.getRecords();
+            for(int i = 0; i < inputBuffPage.getRecordCnt(); i++) {
+                int joinHashCode = 0;
+                Record record = records[i];
+                List<char[]> attrList = record.getAttributes();
+                for (String attr : joinAttrs) { // Get the XORs of join column of record for partitioning
+                    int joinAttrPos = joinAttrPosR.get(attr);
+                    String attrVal = new String(attrList.get(joinAttrPos)).trim();
+                    int hashCode = attrVal.hashCode();
+                    joinHashCode ^= hashCode;
+                }
+                // Partitioning by hash function
+                int partitionNum = Math.floorMod(joinHashCode, PARTITION_CNT);
+                partitioningBuffPages[partitionNum].addRecord(record);
+
+                if(partitioningBuffPages[partitionNum].isFull()) { // If partitionBuffer is full, write to the disk
+                    byte[] buffByte = partitioningBuffPages[partitionNum].getByteArray();
+                    partitionOutput[partitionNum].write(buffByte);
+                    partitioningBuffPages[partitionNum].clear();
+                }
+            }
+            inputBuffPage.clear();
+        }
+
+        for(int i = 0; i < partitioningBuffPages.length; i++) { // If partitionBuffer is not empty, write to the disk
+            if(partitioningBuffPages[i].getRecordCnt() > 0) {
+                byte[] buffByte = partitioningBuffPages[i].getByteArray();
+                partitionOutput[i].write(buffByte);
+                partitioningBuffPages[i].clear();
+            }
+        }
+
+        for(int i = 0; i < PARTITION_CNT; i++) {
+            partitionOutput[i].close();
+        }
+        input.close();
+        return temporaryFilesR;
     }
 }

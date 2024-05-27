@@ -1,19 +1,15 @@
 package org.example.ui;
 
-import org.example.buffer.BufferPage;
 import org.example.metadata.AttributeMetadata;
 import org.example.metadata.RelationMetadata;
 import org.example.processor.DDLInterpreter;
 import org.example.processor.DMLOrganizer;
-import org.example.record.Block;
-import org.example.record.BlockingFactor;
 import org.example.record.JoinedRecords;
 import org.example.record.Record;
 
 import java.io.FileNotFoundException;
 import java.io.IOException;
 
-import java.io.RandomAccessFile;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -126,12 +122,12 @@ public class TextUI {
                     // Get attribute metadata to join
                     ArrayList<AttributeMetadata>[] attributeMetadataListArr = getAttributeMetadataToJoin(relationMetadataArr, dmlOrganizer, conn);
 
-                    HashMap<String, Integer>[] joinAttrPosArr = getJoinArrtPosArr(relationMetadataArr, scanner, attributeMetadataListArr);
+                    HashMap<String, Integer>[] joinAttrPosArr = getJoinAttrPosArr(relationMetadataArr, scanner, attributeMetadataListArr);
 
                     List<String> joinAttr = getJoinAttr(joinAttrPosArr);
 
                     // TODO REFACTORING inside testJoin and change name of testJoin, after all refactoring, delete unused import
-                    JoinedRecords joinedRecords = dmlOrganizer.testJoin(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
+                    JoinedRecords joinedRecords = dmlOrganizer.getResultsForJoinRelations(relationMetadataArr, attributeMetadataListArr, joinAttr, joinAttrPosArr);
 
                     // Print the join result
                     printResultSet(joinedRecords.getAttrMetadataList(), joinedRecords.getResultSet());
@@ -523,7 +519,7 @@ public class TextUI {
         return attributeMetadataListArr;
     }
 
-    private static HashMap<String, Integer>[] getJoinArrtPosArr(RelationMetadata[] relationMetadataArr, Scanner scanner, ArrayList<AttributeMetadata>[] attributeMetadataListArr) {
+    private static HashMap<String, Integer>[] getJoinAttrPosArr(RelationMetadata[] relationMetadataArr, Scanner scanner, ArrayList<AttributeMetadata>[] attributeMetadataListArr) {
         HashMap<String, Integer>[] joinAttrPosArr = new HashMap[relationMetadataArr.length];
         for(int i = 0; i < joinAttrPosArr.length; i++) {
             joinAttrPosArr[i] = new HashMap<>();
@@ -541,6 +537,7 @@ public class TextUI {
             while(true) {
                 System.out.printf("Enter the name of join column[" + i + "]: ");
                 jointAttrName = scanner.nextLine();
+                jointAttrName = jointAttrName.toLowerCase();
                 System.out.println();
 
                 // Preventing duplicate join column
