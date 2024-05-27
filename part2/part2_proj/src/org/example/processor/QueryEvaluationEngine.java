@@ -318,21 +318,22 @@ public class QueryEvaluationEngine {
         }
     }
 
-    private static File[] partition(List<String> joinAttrs, List<AttributeMetadata> attrMetadataListR, RelationMetadata relationMetadataR, List<Integer> attPosOfPrimaryKeyR, BufferPage inputBuffPage, HashMap<String, Integer> joinAttrPosR, BufferPage[] partitioningBuffPages, String tempFileName) throws IOException {
-        File[] temporaryFilesR;
-        int recordSize = getRecordSize(attrMetadataListR);
-        RandomAccessFile input = new RandomAccessFile(relationMetadataR.getLocation() + relationMetadataR.getRelationName() + ".tbl", "r");
+    private static File[] partition(List<String> joinAttrs, List<AttributeMetadata> attrMetadataList, RelationMetadata relationMetadata,
+                                    List<Integer> attPosOfPrimaryKey, BufferPage inputBuffPage, HashMap<String, Integer> joinAttrPosMap, BufferPage[] partitioningBuffPages, String tempFileName) throws IOException {
+        File[] temporaryFiles;
+        int recordSize = getRecordSize(attrMetadataList);
+        RandomAccessFile input = new RandomAccessFile(relationMetadata.getLocation() + relationMetadata.getRelationName() + ".tbl", "r");
 
         // Creating temporary files for Partitioning
-        temporaryFilesR = new File[PARTITION_CNT];
+        temporaryFiles = new File[PARTITION_CNT];
         FileOutputStream[] partitionOutput = new FileOutputStream[PARTITION_CNT];
         for(int i = 0; i < PARTITION_CNT; i++) {
-            temporaryFilesR[i] = new File("temporary_file" + "/" + tempFileName + i + ".tmptbl");
-            if(temporaryFilesR[i].exists()) {
-                temporaryFilesR[i].delete();
+            temporaryFiles[i] = new File("temporary_file" + "/" + tempFileName + i + ".tmptbl");
+            if(temporaryFiles[i].exists()) {
+                temporaryFiles[i].delete();
             }
-            temporaryFilesR[i].createNewFile();
-            partitionOutput[i] = new FileOutputStream(temporaryFilesR[i], true);
+            temporaryFiles[i].createNewFile();
+            partitionOutput[i] = new FileOutputStream(temporaryFiles[i], true);
         }
 
         int blockIdx = 0;
@@ -342,7 +343,7 @@ public class QueryEvaluationEngine {
             // Read to input buffer page
             byte[] readBlockBytes = new byte[blockSize];
             int readCnt = input.read(readBlockBytes);
-            Block readBlock = new Block(blockIdx++, readBlockBytes, attrMetadataListR);
+            Block readBlock = new Block(blockIdx++, readBlockBytes, attrMetadataList);
 
             if(readCnt == -1) { // EOF
                 break;
@@ -354,7 +355,7 @@ public class QueryEvaluationEngine {
                 // If some attribute of primary-key of a record is NULL, it is a deleted record.
                 // So don't contain the deleted record to the result set
                 boolean isDeleted = false;
-                for(int pos : attPosOfPrimaryKeyR) {
+                for(int pos : attPosOfPrimaryKey) {
                     if (isNullAttribute(readRecord.getAttributes().get(pos))){
                         isDeleted = true;
                         break;
@@ -372,7 +373,7 @@ public class QueryEvaluationEngine {
                 Record record = records[i];
                 List<char[]> attrList = record.getAttributes();
                 for (String attr : joinAttrs) { // Get the XORs of join column of record for partitioning
-                    int joinAttrPos = joinAttrPosR.get(attr);
+                    int joinAttrPos = joinAttrPosMap.get(attr);
                     String attrVal = new String(attrList.get(joinAttrPos)).trim();
                     int hashCode = attrVal.hashCode();
                     joinHashCode ^= hashCode;
@@ -402,7 +403,7 @@ public class QueryEvaluationEngine {
             partitionOutput[i].close();
         }
         input.close();
-        return temporaryFilesR;
+        return temporaryFiles;
     }
 
     private static JoinedRecords getJoinedRecords(List<String> joinAttrs, List<AttributeMetadata> attrMetadataListS, List<AttributeMetadata> attrMetadataListR, HashMap<String, Integer> joinAttrPosS, HashMap<String, Integer> joinAttrPosR, File[] temporaryFilesS, File[] temporaryFilesR) throws IOException {
