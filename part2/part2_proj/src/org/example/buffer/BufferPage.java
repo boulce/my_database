@@ -35,7 +35,8 @@ public class BufferPage {
             }
 
             // Exclude null record
-            boolean isValidRecord = attributes.stream().anyMatch(attr -> !isNullAttribute(attr));
+            boolean isValidRecord = attributes.stream()
+                    .anyMatch(attr -> !isNullAttribute(attr));
             if(!isValidRecord) {
                 continue;
             }
