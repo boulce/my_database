@@ -12,14 +12,6 @@ public class Block {
     int idx;
     Record[] records;
 
-    public int getIdx() {
-        return idx;
-    }
-
-    public void setIdx(int idx) {
-        this.idx = idx;
-    }
-
     public Block(int idx, List<char[]> attChars) {
         this.idx = idx;
         records = new Record[BlockingFactor.VAL];
@@ -61,6 +53,14 @@ public class Block {
             int link = ByteUtil.byteArrayToInt(linkBytes);
             records[i] = new Record(attributes, link);
         }
+    }
+
+    public int getIdx() {
+        return idx;
+    }
+
+    public void setIdx(int idx) {
+        this.idx = idx;
     }
 
     public Record[] getRecords() {
