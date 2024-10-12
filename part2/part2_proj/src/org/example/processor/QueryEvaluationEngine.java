@@ -487,7 +487,7 @@ public class QueryEvaluationEngine {
                     Record record = records[j];
                     int joinHashCode = 0;
                     List<char[]> attrListProbe = record.getAttributes();
-                    for (String attr : joinAttrs) { // Get the XORs of join column of record for building hash index
+                    for (String attr : joinAttrs) { // Get the XORs of join column of record
                         int joinAttrPos = joinAttrPosProbe.get(attr);
                         String attrVal = new String(attrListProbe.get(joinAttrPos)).trim();
                         int hashCode = attrVal.hashCode();
