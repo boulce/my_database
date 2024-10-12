@@ -306,7 +306,7 @@ public class QueryEvaluationEngine {
             // Partitioning relation S
             temporaryFilesS = partition(joinAttrs, attrMetadataListS, relationMetadataS, attPosOfPrimaryKeyS, inputBuffPage, joinAttrPosS, partitioningBuffPages, "s");
 
-            // Matching records ang get JoinedRecords
+            // Match records and get JoinedRecords
             JoinedRecords joinedRecords = getJoinedRecords(joinAttrs, attrMetadataListS, attrMetadataListR, joinAttrPosS, joinAttrPosR, temporaryFilesS, temporaryFilesR);
 
             // Delete temporary files
